@@ -139,6 +139,10 @@ function readPurchaseMode(input: Record<string, unknown>): PurchaseMode {
   return input.purchaseMode === 'offline' ? 'offline' : 'online';
 }
 
+function hasInputField(input: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(input, key);
+}
+
 function serializeItem(item: WarrantyItem) {
   return {
     id: item.id,
@@ -720,6 +724,92 @@ export default function Home() {
           setItems((current) => [item, ...current]);
           setSelectedId(item.id);
           return serializeItem(item);
+        },
+      },
+      {
+        name: 'warranty_vault.update_item',
+        title: 'Update warranty item',
+        description:
+          'Update fields on an existing warranty item. Omitted fields are left unchanged, and existing supporting documents are preserved.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description:
+                'Warranty item ID returned by search_items, get_item, or create_item.',
+            },
+            productName: { type: 'string' },
+            brand: { type: 'string' },
+            category: { type: 'string' },
+            purchaseDate: { type: 'string', format: 'date' },
+            warrantyEndDate: { type: 'string', format: 'date' },
+            invoiceAmount: {
+              type: 'number',
+              description: 'Invoice amount in Indian rupees.',
+            },
+            purchaseMode: { type: 'string', enum: ['online', 'offline'] },
+            storeName: { type: 'string' },
+            storeAddress: { type: 'string' },
+            pointOfContact: { type: 'string' },
+            notes: { type: 'string' },
+          },
+          required: ['id'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+        execute: async (input) => {
+          const id = readString(input, 'id');
+          const existing = itemsRef.current.find((item) => item.id === id);
+          if (!existing) return { error: 'Item not found' };
+
+          const updatedForm: WarrantyForm = {
+            productName: hasInputField(input, 'productName')
+              ? readString(input, 'productName') || existing.productName
+              : existing.productName,
+            brand: hasInputField(input, 'brand')
+              ? readString(input, 'brand')
+              : existing.brand,
+            category: hasInputField(input, 'category')
+              ? readString(input, 'category')
+              : existing.category,
+            purchaseDate: hasInputField(input, 'purchaseDate')
+              ? readString(input, 'purchaseDate') || existing.purchaseDate
+              : existing.purchaseDate,
+            warrantyEndDate: hasInputField(input, 'warrantyEndDate')
+              ? readString(input, 'warrantyEndDate') || existing.warrantyEndDate
+              : existing.warrantyEndDate,
+            invoiceAmount: hasInputField(input, 'invoiceAmount')
+              ? readNumber(input, 'invoiceAmount')
+              : existing.invoiceAmount,
+            purchaseMode: hasInputField(input, 'purchaseMode')
+              ? readPurchaseMode(input)
+              : existing.purchaseMode,
+            storeName: hasInputField(input, 'storeName')
+              ? readString(input, 'storeName')
+              : existing.storeName,
+            storeAddress: hasInputField(input, 'storeAddress')
+              ? readString(input, 'storeAddress')
+              : existing.storeAddress,
+            pointOfContact: hasInputField(input, 'pointOfContact')
+              ? readString(input, 'pointOfContact')
+              : existing.pointOfContact,
+            notes: hasInputField(input, 'notes')
+              ? readString(input, 'notes')
+              : existing.notes,
+          };
+          const updatedItem = await saveWarrantyItem(
+            updatedForm,
+            existing.documents,
+            existing.id,
+          ).catch(() => null);
+
+          if (!updatedItem) return { error: 'Unable to update item' };
+          setItems((current) =>
+            current.map((item) => (item.id === existing.id ? updatedItem : item)),
+          );
+          setSelectedId(updatedItem.id);
+          return serializeItem(updatedItem);
         },
       },
       {
