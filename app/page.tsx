@@ -21,15 +21,12 @@ import {
 import {
   Bar,
   BarChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,6 +63,45 @@ type WarrantyItem = {
 
 type WarrantyForm = Omit<WarrantyItem, 'id' | 'documents'>;
 
+type WebMcpTool = {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  annotations?: {
+    readOnlyHint?: boolean;
+    untrustedContentHint?: boolean;
+  };
+  execute: (input: Record<string, unknown>) => unknown;
+};
+
+type WebMcpHost = {
+  registerTool?: (
+    tool: WebMcpTool,
+    options?: { signal?: AbortSignal },
+  ) => Promise<void> | void;
+};
+
+declare global {
+  interface Document {
+    modelContext?: WebMcpHost;
+  }
+
+  interface Navigator {
+    modelContext?: WebMcpHost;
+  }
+
+  interface Window {
+    __warrantyVaultWebMCP?: {
+      tools: WebMcpTool[];
+      executeTool: (
+        name: string,
+        input?: Record<string, unknown>,
+      ) => unknown;
+    };
+  }
+}
+
 const storageKey = 'warranty-vault-items-v1';
 
 const emptyForm: WarrantyForm = {
@@ -82,11 +118,111 @@ const emptyForm: WarrantyForm = {
   notes: '',
 };
 
-const palette = {
-  active: '#0f9f6e',
-  expiring: '#d97706',
-  expired: '#dc2626',
-};
+function createBlankForm(): WarrantyForm {
+  return {
+    ...emptyForm,
+    purchaseDate: daysFromNow(0),
+    warrantyEndDate: daysFromNow(365),
+  };
+}
+
+function readString(input: Record<string, unknown>, key: string) {
+  const value = input[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function readNumber(input: Record<string, unknown>, key: string) {
+  const value = input[key];
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function readPurchaseMode(input: Record<string, unknown>): PurchaseMode {
+  return input.purchaseMode === 'offline' ? 'offline' : 'online';
+}
+
+function serializeItem(item: WarrantyItem) {
+  return {
+    id: item.id,
+    productName: item.productName,
+    brand: item.brand,
+    category: item.category,
+    purchaseDate: item.purchaseDate,
+    warrantyEndDate: item.warrantyEndDate,
+    invoiceAmount: item.invoiceAmount,
+    purchaseMode: item.purchaseMode,
+    storeName: item.storeName,
+    storeAddress: item.storeAddress,
+    pointOfContact: item.pointOfContact,
+    notes: item.notes,
+    status: getStatus(item.warrantyEndDate),
+    remaining: formatRemaining(item.warrantyEndDate),
+    documents: item.documents.map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      type: doc.type,
+      size: doc.size,
+      uploadedAt: doc.uploadedAt,
+    })),
+  };
+}
+
+function serializeDocument(item: WarrantyItem, doc: WarrantyDocument) {
+  return {
+    id: doc.id,
+    itemId: item.id,
+    itemName: item.productName,
+    name: doc.name,
+    type: doc.type,
+    size: doc.size,
+    uploadedAt: doc.uploadedAt,
+  };
+}
+
+function findDocument(items: WarrantyItem[], documentId: string) {
+  for (const item of items) {
+    const document = item.documents.find((doc) => doc.id === documentId);
+    if (document) return { item, document };
+  }
+
+  return null;
+}
+
+function estimateDataUrlSize(dataUrl: string) {
+  const base64 = dataUrl.split(',')[1] ?? '';
+  return Math.max(0, Math.floor((base64.length * 3) / 4));
+}
+
+function readDocuments(input: Record<string, unknown>) {
+  const rawDocuments = input.documents;
+  if (!Array.isArray(rawDocuments)) return [];
+
+  return rawDocuments.flatMap((rawDocument) => {
+    if (!rawDocument || typeof rawDocument !== 'object') return [];
+    const documentInput = rawDocument as Record<string, unknown>;
+    const name = readString(documentInput, 'name') || 'supporting-document';
+    const type = readString(documentInput, 'type') || 'application/octet-stream';
+    const dataUrl = readString(documentInput, 'dataUrl');
+    const size = readNumber(documentInput, 'size') || estimateDataUrlSize(dataUrl);
+
+    if (!dataUrl.startsWith('data:')) return [];
+
+    return [
+      {
+        id: crypto.randomUUID(),
+        name,
+        type,
+        size,
+        dataUrl,
+        uploadedAt: new Date().toISOString(),
+      },
+    ];
+  });
+}
 
 function daysFromNow(days: number) {
   const date = new Date();
@@ -103,7 +239,7 @@ function createSampleItems(): WarrantyItem[] {
       category: 'Laptop',
       purchaseDate: daysFromNow(-250),
       warrantyEndDate: daysFromNow(115),
-      invoiceAmount: 1999,
+      invoiceAmount: 199900,
       purchaseMode: 'online',
       storeName: 'Apple Store Online',
       storeAddress: '',
@@ -118,7 +254,7 @@ function createSampleItems(): WarrantyItem[] {
       category: 'Camera',
       purchaseDate: daysFromNow(-680),
       warrantyEndDate: daysFromNow(22),
-      invoiceAmount: 1280,
+      invoiceAmount: 128000,
       purchaseMode: 'offline',
       storeName: 'Downtown Photo Center',
       storeAddress: '118 Market Street',
@@ -133,7 +269,7 @@ function createSampleItems(): WarrantyItem[] {
       category: 'Appliance',
       purchaseDate: daysFromNow(-1180),
       warrantyEndDate: daysFromNow(-45),
-      invoiceAmount: 749,
+      invoiceAmount: 74900,
       purchaseMode: 'offline',
       storeName: 'HomePlus Appliances',
       storeAddress: '42 North Avenue',
@@ -142,6 +278,20 @@ function createSampleItems(): WarrantyItem[] {
       documents: [],
     },
   ];
+}
+
+function migrateStoredItems(items: WarrantyItem[]) {
+  const sampleRupeeAmounts: Record<string, number> = {
+    'sample-laptop': 199900,
+    'sample-camera': 128000,
+    'sample-washer': 74900,
+  };
+
+  return items.map((item) =>
+    sampleRupeeAmounts[item.id] && item.invoiceAmount < 10000
+      ? { ...item, invoiceAmount: sampleRupeeAmounts[item.id] }
+      : item,
+  );
 }
 
 function getRemainingDays(endDate: string) {
@@ -169,9 +319,9 @@ function formatRemaining(endDate: string) {
 }
 
 function formatMoney(value: number) {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
     maximumFractionDigits: 0,
   }).format(value || 0);
 }
@@ -191,11 +341,7 @@ function fileSize(size: number) {
 }
 
 export default function Home() {
-  const [items, setItems] = useState<WarrantyItem[]>(() => {
-    if (typeof window === 'undefined') return createSampleItems();
-    const stored = window.localStorage.getItem(storageKey);
-    return stored ? (JSON.parse(stored) as WarrantyItem[]) : createSampleItems();
-  });
+  const [items, setItems] = useState<WarrantyItem[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | WarrantyStatus>('all');
@@ -204,12 +350,433 @@ export default function Home() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<WarrantyDocument | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const itemsRef = useRef<WarrantyItem[]>([]);
 
   useEffect(() => {
-    if (items.length > 0) {
-      window.localStorage.setItem(storageKey, JSON.stringify(items));
-    }
+    itemsRef.current = items;
   }, [items]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      const stored = window.localStorage.getItem(storageKey);
+      let nextItems = createSampleItems();
+
+      if (stored) {
+      try {
+          nextItems = migrateStoredItems(JSON.parse(stored) as WarrantyItem[]);
+        } catch {
+          window.localStorage.removeItem(storageKey);
+        }
+      }
+
+      setItems(nextItems);
+      setSelectedId(nextItems[0]?.id ?? '');
+      setIsReady(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+    window.localStorage.setItem(storageKey, JSON.stringify(items));
+  }, [isReady, items]);
+
+  const startAdd = useCallback(() => {
+    setForm(createBlankForm());
+    setDocuments([]);
+    setEditingId(null);
+    setIsFormOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+
+    const controller = new AbortController();
+    const buildTools = (): WebMcpTool[] => [
+      {
+        name: 'warranty_vault.get_summary',
+        title: 'Get warranty summary',
+        description:
+          'Return counts, invoice value, and status totals for the warranty vault dashboard.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: true },
+        execute: () => {
+          const currentItems = itemsRef.current;
+          const counts = currentItems.reduce(
+            (acc, item) => {
+              acc[getStatus(item.warrantyEndDate)] += 1;
+              return acc;
+            },
+            { active: 0, expiring: 0, expired: 0 },
+          );
+
+          return {
+            totalItems: currentItems.length,
+            activeWarranties: counts.active,
+            expiringSoon: counts.expiring,
+            expired: counts.expired,
+            totalInvoiceValue: currentItems.reduce(
+              (sum, item) => sum + item.invoiceAmount,
+              0,
+            ),
+            currency: 'INR',
+            documentsSaved: currentItems.reduce(
+              (sum, item) => sum + item.documents.length,
+              0,
+            ),
+          };
+        },
+      },
+      {
+        name: 'warranty_vault.search_items',
+        title: 'Search warranty items',
+        description:
+          'Search warranty items by product, brand, category, store, contact, or status.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search text to match against item fields.',
+            },
+            status: {
+              type: 'string',
+              enum: ['all', 'active', 'expiring', 'expired'],
+              description: 'Optional warranty status filter.',
+            },
+          },
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: true },
+        execute: (input) => {
+          const queryText = readString(input, 'query').toLowerCase();
+          const status = readString(input, 'status') || 'all';
+
+          return itemsRef.current
+            .filter((item) => {
+              const itemStatus = getStatus(item.warrantyEndDate);
+              const matchesStatus = status === 'all' || status === itemStatus;
+              const haystack = [
+                item.productName,
+                item.brand,
+                item.category,
+                item.storeName,
+                item.pointOfContact,
+              ]
+                .join(' ')
+                .toLowerCase();
+
+              return matchesStatus && haystack.includes(queryText);
+            })
+            .map(serializeItem);
+        },
+      },
+      {
+        name: 'warranty_vault.get_item',
+        title: 'Get warranty item',
+        description:
+          'Return full details for one warranty item, excluding raw document file contents.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Warranty item ID returned by search_items.',
+            },
+          },
+          required: ['id'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: true },
+        execute: (input) => {
+          const id = readString(input, 'id');
+          const item = itemsRef.current.find((entry) => entry.id === id);
+          return item ? serializeItem(item) : { error: 'Item not found' };
+        },
+      },
+      {
+        name: 'warranty_vault.list_documents',
+        title: 'List warranty documents',
+        description:
+          'List supporting documents attached to warranty items, including document IDs needed to preview or download them.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            itemId: {
+              type: 'string',
+              description:
+                'Optional warranty item ID. When omitted, documents for all items are returned.',
+            },
+          },
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
+        execute: (input) => {
+          const itemId = readString(input, 'itemId');
+          const currentItems = itemId
+            ? itemsRef.current.filter((item) => item.id === itemId)
+            : itemsRef.current;
+
+          return currentItems.flatMap((item) =>
+            item.documents.map((doc) => serializeDocument(item, doc)),
+          );
+        },
+      },
+      {
+        name: 'warranty_vault.open_document_preview',
+        title: 'Open document preview',
+        description:
+          'Open a supporting warranty document preview in the current page for the user.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            documentId: {
+              type: 'string',
+              description: 'Document ID returned by list_documents or get_item.',
+            },
+          },
+          required: ['documentId'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+        execute: (input) => {
+          const documentId = readString(input, 'documentId');
+          const match = findDocument(itemsRef.current, documentId);
+          if (!match) return { error: 'Document not found' };
+
+          setSelectedId(match.item.id);
+          setPreviewDoc(match.document);
+          return { opened: true, document: serializeDocument(match.item, match.document) };
+        },
+      },
+      {
+        name: 'warranty_vault.get_document_download',
+        title: 'Get document download',
+        description:
+          'Return the selected supporting document with filename, MIME type, size, and data URL so an agent can view or download it.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            documentId: {
+              type: 'string',
+              description: 'Document ID returned by list_documents or get_item.',
+            },
+          },
+          required: ['documentId'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
+        execute: (input) => {
+          const documentId = readString(input, 'documentId');
+          const match = findDocument(itemsRef.current, documentId);
+          if (!match) return { error: 'Document not found' };
+
+          return {
+            ...serializeDocument(match.item, match.document),
+            downloadName: match.document.name,
+            mimeType: match.document.type,
+            dataUrl: match.document.dataUrl,
+          };
+        },
+      },
+      {
+        name: 'warranty_vault.open_add_product_form',
+        title: 'Open add product form',
+        description:
+          'Open the Warranty Vault add product form in the current page for the user.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: false },
+        execute: () => {
+          startAdd();
+          return { opened: true };
+        },
+      },
+      {
+        name: 'warranty_vault.create_item',
+        title: 'Create warranty item',
+        description:
+          'Create a warranty item from structured purchase and coverage details, optionally including supporting document data URLs.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            productName: { type: 'string' },
+            brand: { type: 'string' },
+            category: { type: 'string' },
+            purchaseDate: { type: 'string', format: 'date' },
+            warrantyEndDate: { type: 'string', format: 'date' },
+            invoiceAmount: {
+              type: 'number',
+              description: 'Invoice amount in Indian rupees.',
+            },
+            purchaseMode: { type: 'string', enum: ['online', 'offline'] },
+            storeName: { type: 'string' },
+            storeAddress: { type: 'string' },
+            pointOfContact: { type: 'string' },
+            notes: { type: 'string' },
+            documents: {
+              type: 'array',
+              description:
+                'Optional supporting documents such as invoices, bills, manuals, warranty cards, or product images. Each document must include a dataUrl.',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  type: {
+                    type: 'string',
+                    description: 'MIME type, for example application/pdf or image/png.',
+                  },
+                  size: {
+                    type: 'number',
+                    description: 'File size in bytes, when known.',
+                  },
+                  dataUrl: {
+                    type: 'string',
+                    description:
+                      'Data URL containing the document contents, used for preview and download.',
+                  },
+                },
+                required: ['name', 'dataUrl'],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ['productName', 'purchaseDate', 'warrantyEndDate'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+        execute: (input) => {
+          const attachedDocuments = readDocuments(input);
+          const item: WarrantyItem = {
+            id: crypto.randomUUID(),
+            productName: readString(input, 'productName') || 'Untitled product',
+            brand: readString(input, 'brand'),
+            category: readString(input, 'category'),
+            purchaseDate: readString(input, 'purchaseDate') || daysFromNow(0),
+            warrantyEndDate:
+              readString(input, 'warrantyEndDate') || daysFromNow(365),
+            invoiceAmount: readNumber(input, 'invoiceAmount'),
+            purchaseMode: readPurchaseMode(input),
+            storeName: readString(input, 'storeName'),
+            storeAddress: readString(input, 'storeAddress'),
+            pointOfContact: readString(input, 'pointOfContact'),
+            notes: readString(input, 'notes'),
+            documents: attachedDocuments,
+          };
+
+          setItems((current) => [item, ...current]);
+          setSelectedId(item.id);
+          return serializeItem(item);
+        },
+      },
+      {
+        name: 'warranty_vault.add_documents',
+        title: 'Add supporting documents',
+        description:
+          'Attach supporting document data URLs to an existing warranty item so they can be previewed and downloaded later.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            itemId: {
+              type: 'string',
+              description: 'Warranty item ID returned by search_items or create_item.',
+            },
+            documents: {
+              type: 'array',
+              description:
+                'Supporting documents such as invoices, bills, manuals, warranty cards, or product images.',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  type: {
+                    type: 'string',
+                    description: 'MIME type, for example application/pdf or image/jpeg.',
+                  },
+                  size: {
+                    type: 'number',
+                    description: 'File size in bytes, when known.',
+                  },
+                  dataUrl: {
+                    type: 'string',
+                    description:
+                      'Data URL containing the document contents, used for preview and download.',
+                  },
+                },
+                required: ['name', 'dataUrl'],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ['itemId', 'documents'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: false, untrustedContentHint: true },
+        execute: (input) => {
+          const itemId = readString(input, 'itemId');
+          const attachedDocuments = readDocuments(input);
+          let updatedItem: WarrantyItem | null = null;
+
+          setItems((current) =>
+            current.map((item) => {
+              if (item.id !== itemId) return item;
+              updatedItem = {
+                ...item,
+                documents: [...item.documents, ...attachedDocuments],
+              };
+              return updatedItem;
+            }),
+          );
+
+          if (!updatedItem) return { error: 'Item not found' };
+          setSelectedId(itemId);
+          return serializeItem(updatedItem);
+        },
+      },
+    ];
+
+    const tools = buildTools();
+    window.__warrantyVaultWebMCP = {
+      tools,
+      executeTool: (name, input = {}) => {
+        const tool = tools.find((entry) => entry.name === name);
+        if (!tool) return { error: `Unknown tool: ${name}` };
+        return tool.execute(input);
+      },
+    };
+
+    const hosts = [document.modelContext, navigator.modelContext].filter(
+      (host, index, allHosts): host is WebMcpHost =>
+        Boolean(host?.registerTool) && allHosts.indexOf(host) === index,
+    );
+
+    if (hosts.length === 0) {
+      return () => {
+        controller.abort();
+        delete window.__warrantyVaultWebMCP;
+      };
+    }
+
+    Promise.all(
+      hosts.flatMap((host) =>
+        tools.map((tool) =>
+          Promise.resolve(host.registerTool?.(tool, { signal: controller.signal })),
+        ),
+      ),
+    ).catch(() => undefined);
+
+    return () => {
+      controller.abort();
+      delete window.__warrantyVaultWebMCP;
+    };
+  }, [isReady, startAdd]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -248,12 +815,6 @@ export default function Home() {
 
     return { ...counts, total: items.length, totalValue, documentsCount };
   }, [items]);
-
-  const pieData = [
-    { name: 'Active', value: metrics.active, color: palette.active },
-    { name: 'Expiring', value: metrics.expiring, color: palette.expiring },
-    { name: 'Expired', value: metrics.expired, color: palette.expired },
-  ].filter((entry) => entry.value > 0);
 
   const upcomingData = items
     .map((item) => ({
@@ -310,11 +871,6 @@ export default function Home() {
     setEditingId(null);
   }
 
-  function startAdd() {
-    resetForm();
-    setIsFormOpen(true);
-  }
-
   function startEdit(item: WarrantyItem) {
     const { id: _id, documents: itemDocuments, ...editable } = item;
     setForm(editable);
@@ -364,6 +920,20 @@ export default function Home() {
     setDocuments((current) => current.filter((doc) => doc.id !== docId));
   }
 
+  if (!isReady) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,#e7f8f1_0,#f7faf7_34%,#f6f3ee_100%)] text-slate-950">
+        <div className="rounded-lg border border-slate-200 bg-white/88 p-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-lg bg-emerald-700 text-white shadow-sm">
+            <ShieldCheck className="size-6" />
+          </div>
+          <h1 className="text-xl font-semibold">Warranty Vault</h1>
+          <p className="mt-1 text-sm text-slate-500">Loading your coverage dashboard</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e7f8f1_0,#f7faf7_34%,#f6f3ee_100%)] text-slate-950">
       <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
@@ -392,6 +962,7 @@ export default function Home() {
               />
             </div>
             <Button
+              type="button"
               onClick={startAdd}
               className="h-10 bg-emerald-700 px-4 text-white hover:bg-emerald-800"
             >
@@ -430,8 +1001,8 @@ export default function Home() {
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-            <section className="rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
+          <div className="flex min-w-0 flex-col gap-5">
+            <section className="min-w-0 rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold">Warranty portfolio</h2>
@@ -468,6 +1039,7 @@ export default function Home() {
                     into view.
                   </p>
                   <Button
+                    type="button"
                     onClick={startAdd}
                     className="mt-4 bg-emerald-700 text-white hover:bg-emerald-800"
                   >
@@ -491,59 +1063,28 @@ export default function Home() {
               )}
             </section>
 
-            <section className="grid content-start gap-5">
-              <div className="rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
-                <h2 className="text-lg font-semibold">Coverage mix</h2>
-                <div className="mt-2 h-60">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                    <PieChart>
-                      <Pie
-                        data={
-                          pieData.length
-                            ? pieData
-                            : [{ name: 'None', value: 1, color: '#cbd5e1' }]
-                        }
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={58}
-                        outerRadius={86}
-                        paddingAngle={4}
-                        fill={pieData[0]?.color ?? '#cbd5e1'}
-                      />
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <Legend label="Active" color={palette.active} value={metrics.active} />
-                  <Legend
-                    label="Expiring"
-                    color={palette.expiring}
-                    value={metrics.expiring}
+            <section className="min-w-0 rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
+              <h2 className="text-lg font-semibold">Next expirations</h2>
+              <div className="mt-4 flex h-60 justify-center overflow-hidden">
+                <BarChart
+                  width={760}
+                  height={236}
+                  data={upcomingData}
+                  layout="vertical"
+                  margin={{ left: 18, right: 24 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={150}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 12, fill: '#475569' }}
                   />
-                  <Legend label="Expired" color={palette.expired} value={metrics.expired} />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
-                <h2 className="text-lg font-semibold">Next expirations</h2>
-                <div className="mt-4 h-56">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                    <BarChart data={upcomingData} layout="vertical" margin={{ left: 12 }}>
-                      <XAxis type="number" hide />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={96}
-                        tickLine={false}
-                        axisLine={false}
-                        tick={{ fontSize: 12, fill: '#475569' }}
-                      />
-                      <Tooltip />
-                      <Bar dataKey="days" radius={[0, 6, 6, 0]} fill="#2f7f9f" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  <Tooltip />
+                  <Bar dataKey="days" radius={[0, 6, 6, 0]} fill="#2f7f9f" />
+                </BarChart>
               </div>
             </section>
           </div>
@@ -621,7 +1162,7 @@ export default function Home() {
                     placeholder="Laptop, appliance, phone"
                   />
                 </Field>
-                <Field label="Invoice amount">
+                <Field label="Invoice amount (INR)">
                   <Input
                     type="number"
                     min="0"
@@ -630,7 +1171,7 @@ export default function Home() {
                     onChange={(event) =>
                       updateForm('invoiceAmount', Number(event.target.value))
                     }
-                    placeholder="1299"
+                    placeholder="74999"
                   />
                 </Field>
                 <Field label="Purchase date" required>
@@ -765,7 +1306,10 @@ export default function Home() {
                 >
                   Cancel
                 </Button>
-                <Button className="bg-emerald-700 text-white hover:bg-emerald-800">
+                <Button
+                  type="submit"
+                  className="bg-emerald-700 text-white hover:bg-emerald-800"
+                >
                   <ShieldCheck className="size-4" />
                   {editingId ? 'Save Changes' : 'Save Product'}
                 </Button>
@@ -837,8 +1381,12 @@ function WarrantyRow({
           : 'border-slate-200 hover:border-emerald-300'
       }`}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <button type="button" onClick={onSelect} className="min-w-0 text-left">
+      <div className="flex min-w-0 flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+        <button
+          type="button"
+          onClick={onSelect}
+          className="min-w-0 flex-1 text-left"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-base font-semibold">{item.productName}</h3>
             <StatusBadge status={status} />
@@ -847,7 +1395,7 @@ function WarrantyRow({
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
         </button>
-        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:min-w-[430px]">
+        <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-4 2xl:w-[430px] 2xl:shrink-0">
           <MiniFact label="Remaining" value={formatRemaining(item.warrantyEndDate)} />
           <MiniFact label="Ends" value={formatDate(item.warrantyEndDate)} />
           <MiniFact label="Invoice" value={formatMoney(item.invoiceAmount)} />
@@ -1157,27 +1705,6 @@ function DocumentPreview({
           ) : null}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Legend({
-  label,
-  color,
-  value,
-}: {
-  label: string;
-  color: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-lg bg-slate-50 p-2">
-      <span
-        className="mx-auto mb-1 block size-2 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      <p className="font-semibold text-slate-800">{value}</p>
-      <p className="text-slate-500">{label}</p>
     </div>
   );
 }
