@@ -18,13 +18,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, Tooltip, XAxis, YAxis } from 'recharts';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -41,7 +35,9 @@ type WarrantyDocument = {
   name: string;
   type: string;
   size: number;
-  dataUrl: string;
+  dataUrl?: string;
+  url?: string;
+  downloadUrl?: string;
   uploadedAt: string;
 };
 
@@ -94,16 +90,10 @@ declare global {
   interface Window {
     __warrantyVaultWebMCP?: {
       tools: WebMcpTool[];
-      executeTool: (
-        name: string,
-        input?: Record<string, unknown>,
-      ) => unknown;
+      executeTool: (name: string, input?: Record<string, unknown>) => unknown;
     };
   }
 }
-
-const storageKey = 'warranty-vault-items-v1';
-const voltasAcWarrantyItemId = 'voltas-ac-complete-protection-1041641402';
 
 const emptyForm: WarrantyForm = {
   productName: '',
@@ -181,6 +171,8 @@ function serializeDocument(item: WarrantyItem, doc: WarrantyDocument) {
     type: doc.type,
     size: doc.size,
     uploadedAt: doc.uploadedAt,
+    url: doc.url,
+    downloadUrl: doc.downloadUrl,
   };
 }
 
@@ -206,9 +198,11 @@ function readDocuments(input: Record<string, unknown>) {
     if (!rawDocument || typeof rawDocument !== 'object') return [];
     const documentInput = rawDocument as Record<string, unknown>;
     const name = readString(documentInput, 'name') || 'supporting-document';
-    const type = readString(documentInput, 'type') || 'application/octet-stream';
+    const type =
+      readString(documentInput, 'type') || 'application/octet-stream';
     const dataUrl = readString(documentInput, 'dataUrl');
-    const size = readNumber(documentInput, 'size') || estimateDataUrlSize(dataUrl);
+    const size =
+      readNumber(documentInput, 'size') || estimateDataUrlSize(dataUrl);
 
     if (!dataUrl.startsWith('data:')) return [];
 
@@ -225,112 +219,97 @@ function readDocuments(input: Record<string, unknown>) {
   });
 }
 
+async function loadWarrantyItems() {
+  const response = await fetch('/api/warranties', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Unable to load warranty items');
+  const payload = (await response.json()) as { items?: WarrantyItem[] };
+  return payload.items ?? [];
+}
+
+async function saveWarrantyItem(
+  form: WarrantyForm,
+  documents: WarrantyDocument[],
+  editingId: string | null,
+) {
+  const payload = {
+    ...form,
+    productName: form.productName.trim(),
+    brand: form.brand.trim(),
+    category: form.category.trim(),
+    storeName: form.storeName.trim(),
+    storeAddress: form.storeAddress.trim(),
+    pointOfContact: form.pointOfContact.trim(),
+    notes: form.notes.trim(),
+    invoiceAmount: Number(form.invoiceAmount) || 0,
+    documents,
+  };
+  const response = await fetch(
+    editingId
+      ? `/api/warranties/${encodeURIComponent(editingId)}`
+      : '/api/warranties',
+    {
+      method: editingId ? 'PUT' : 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) throw new Error('Unable to save warranty item');
+  const result = (await response.json()) as { item: WarrantyItem };
+  return result.item;
+}
+
+async function deleteWarrantyItem(itemId: string) {
+  const response = await fetch(
+    `/api/warranties/${encodeURIComponent(itemId)}`,
+    {
+      method: 'DELETE',
+    },
+  );
+  if (!response.ok) throw new Error('Unable to delete warranty item');
+}
+
+async function addDocumentsToWarrantyItem(
+  itemId: string,
+  documents: WarrantyDocument[],
+) {
+  const response = await fetch(
+    `/api/warranties/${encodeURIComponent(itemId)}/documents`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ documents }),
+    },
+  );
+
+  if (!response.ok) throw new Error('Unable to add supporting documents');
+  const result = (await response.json()) as { item: WarrantyItem };
+  return result.item;
+}
+
+async function documentToDataUrl(doc: WarrantyDocument) {
+  if (doc.dataUrl) return doc.dataUrl;
+  const source = doc.downloadUrl ?? doc.url;
+  if (!source) return '';
+
+  const response = await fetch(source);
+  if (!response.ok) return '';
+  const blob = await response.blob();
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 function daysFromNow(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function createSampleItems(): WarrantyItem[] {
-  return [
-    createVoltasAcWarrantyItem(),
-    {
-      id: 'sample-laptop',
-      productName: 'MacBook Pro 14',
-      brand: 'Apple',
-      category: 'Laptop',
-      purchaseDate: daysFromNow(-250),
-      warrantyEndDate: daysFromNow(115),
-      invoiceAmount: 199900,
-      purchaseMode: 'online',
-      storeName: 'Apple Store Online',
-      storeAddress: '',
-      pointOfContact: 'support.apple.com',
-      notes: 'AppleCare quote saved with the invoice.',
-      documents: [],
-    },
-    {
-      id: 'sample-camera',
-      productName: 'Alpha Mirrorless Camera',
-      brand: 'Sony',
-      category: 'Camera',
-      purchaseDate: daysFromNow(-680),
-      warrantyEndDate: daysFromNow(22),
-      invoiceAmount: 128000,
-      purchaseMode: 'offline',
-      storeName: 'Downtown Photo Center',
-      storeAddress: '118 Market Street',
-      pointOfContact: 'Rina, service desk',
-      notes: 'Warranty extension decision due this month.',
-      documents: [],
-    },
-    {
-      id: 'sample-washer',
-      productName: 'Front Load Washer',
-      brand: 'LG',
-      category: 'Appliance',
-      purchaseDate: daysFromNow(-1180),
-      warrantyEndDate: daysFromNow(-45),
-      invoiceAmount: 74900,
-      purchaseMode: 'offline',
-      storeName: 'HomePlus Appliances',
-      storeAddress: '42 North Avenue',
-      pointOfContact: 'Store warranty counter',
-      notes: 'Motor warranty may be separate from full appliance coverage.',
-      documents: [],
-    },
-  ];
-}
-
-function createVoltasAcWarrantyItem(): WarrantyItem {
-  return {
-    id: voltasAcWarrantyItemId,
-    productName: 'Voltas 2024 Model 1.5 Ton 5 Star Split Inverter AC - White',
-    brand: 'Voltas',
-    category: 'Air Conditioner',
-    purchaseDate: '2025-06-14',
-    warrantyEndDate: '2028-06-12',
-    invoiceAmount: 0,
-    purchaseMode: 'online',
-    storeName: 'Flipkart',
-    storeAddress: '',
-    pointOfContact: 'OneAssist: 18001233330, happytoassist@oneassist.in',
-    notes:
-      'Complete Appliance Protection (3 years). Plan ID: 1041641402. Device model: 185V CAS(4503690). Device serial numbers: 4553510A25AK00517, 4513555E24LB35979. Includes 3-year coverage, accidental damage and surge protection, one preventive maintenance/cleaning service, and one gas top-up during the 2nd or 3rd year.',
-    documents: [
-      {
-        id: 'doc-cap-ac-1041641402',
-        name: 'cap-ac-TnC-1041641402--.pdf',
-        type: 'application/pdf',
-        size: 55699,
-        dataUrl: '/cap-ac-TnC-1041641402--.pdf',
-        uploadedAt: '2026-09-01T00:00:00.000Z',
-      },
-    ],
-  };
-}
-
-function migrateStoredItems(items: WarrantyItem[]) {
-  const sampleRupeeAmounts: Record<string, number> = {
-    'sample-laptop': 199900,
-    'sample-camera': 128000,
-    'sample-washer': 74900,
-  };
-
-  const migratedItems = items.map((item) =>
-    sampleRupeeAmounts[item.id] && item.invoiceAmount < 10000
-      ? { ...item, invoiceAmount: sampleRupeeAmounts[item.id] }
-      : item,
-  );
-
-  const hasVoltasAc = migratedItems.some(
-    (item) =>
-      item.id === voltasAcWarrantyItemId ||
-      item.notes.includes('1041641402') ||
-      item.productName.includes('Voltas 2024 Model 1.5 Ton 5 Star Split Inverter AC'),
-  );
-
-  return hasVoltasAc ? migratedItems : [createVoltasAcWarrantyItem(), ...migratedItems];
 }
 
 function getRemainingDays(endDate: string) {
@@ -354,7 +333,9 @@ function formatRemaining(endDate: string) {
   if (days < 31) return `${days} days left`;
   const months = Math.floor(days / 30);
   const remainder = days % 30;
-  return remainder > 0 ? `${months} mo ${remainder} d left` : `${months} mo left`;
+  return remainder > 0
+    ? `${months} mo ${remainder} d left`
+    : `${months} mo left`;
 }
 
 function formatMoney(value: number) {
@@ -383,13 +364,17 @@ export default function Home() {
   const [items, setItems] = useState<WarrantyItem[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | WarrantyStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | WarrantyStatus>(
+    'all',
+  );
   const [form, setForm] = useState<WarrantyForm>(emptyForm);
   const [documents, setDocuments] = useState<WarrantyDocument[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<WarrantyDocument | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const itemsRef = useRef<WarrantyItem[]>([]);
 
   useEffect(() => {
@@ -397,28 +382,27 @@ export default function Home() {
   }, [items]);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      const stored = window.localStorage.getItem(storageKey);
-      let nextItems = createSampleItems();
+    let ignore = false;
 
-      if (stored) {
-      try {
-          nextItems = migrateStoredItems(JSON.parse(stored) as WarrantyItem[]);
-        } catch {
-          window.localStorage.removeItem(storageKey);
-        }
-      }
+    loadWarrantyItems()
+      .then((nextItems) => {
+        if (ignore) return;
+        setItems(nextItems);
+        setSelectedId(nextItems[0]?.id ?? '');
+        setLoadError('');
+      })
+      .catch(() => {
+        if (ignore) return;
+        setLoadError('Unable to load your warranty vault right now.');
+      })
+      .finally(() => {
+        if (!ignore) setIsReady(true);
+      });
 
-      setItems(nextItems);
-      setSelectedId(nextItems[0]?.id ?? '');
-      setIsReady(true);
-    });
+    return () => {
+      ignore = true;
+    };
   }, []);
-
-  useEffect(() => {
-    if (!isReady) return;
-    window.localStorage.setItem(storageKey, JSON.stringify(items));
-  }, [isReady, items]);
 
   const startAdd = useCallback(() => {
     setForm(createBlankForm());
@@ -575,7 +559,8 @@ export default function Home() {
           properties: {
             documentId: {
               type: 'string',
-              description: 'Document ID returned by list_documents or get_item.',
+              description:
+                'Document ID returned by list_documents or get_item.',
             },
           },
           required: ['documentId'],
@@ -589,7 +574,10 @@ export default function Home() {
 
           setSelectedId(match.item.id);
           setPreviewDoc(match.document);
-          return { opened: true, document: serializeDocument(match.item, match.document) };
+          return {
+            opened: true,
+            document: serializeDocument(match.item, match.document),
+          };
         },
       },
       {
@@ -602,23 +590,26 @@ export default function Home() {
           properties: {
             documentId: {
               type: 'string',
-              description: 'Document ID returned by list_documents or get_item.',
+              description:
+                'Document ID returned by list_documents or get_item.',
             },
           },
           required: ['documentId'],
           additionalProperties: false,
         },
         annotations: { readOnlyHint: true, untrustedContentHint: true },
-        execute: (input) => {
+        execute: async (input) => {
           const documentId = readString(input, 'documentId');
           const match = findDocument(itemsRef.current, documentId);
           if (!match) return { error: 'Document not found' };
+          const dataUrl = await documentToDataUrl(match.document);
 
           return {
             ...serializeDocument(match.item, match.document),
             downloadName: match.document.name,
             mimeType: match.document.type,
-            dataUrl: match.document.dataUrl,
+            dataUrl,
+            downloadUrl: match.document.downloadUrl ?? match.document.url,
           };
         },
       },
@@ -670,7 +661,8 @@ export default function Home() {
                   name: { type: 'string' },
                   type: {
                     type: 'string',
-                    description: 'MIME type, for example application/pdf or image/png.',
+                    description:
+                      'MIME type, for example application/pdf or image/png.',
                   },
                   size: {
                     type: 'number',
@@ -691,24 +683,27 @@ export default function Home() {
           additionalProperties: false,
         },
         annotations: { readOnlyHint: false, untrustedContentHint: true },
-        execute: (input) => {
+        execute: async (input) => {
           const attachedDocuments = readDocuments(input);
-          const item: WarrantyItem = {
-            id: crypto.randomUUID(),
-            productName: readString(input, 'productName') || 'Untitled product',
-            brand: readString(input, 'brand'),
-            category: readString(input, 'category'),
-            purchaseDate: readString(input, 'purchaseDate') || daysFromNow(0),
-            warrantyEndDate:
-              readString(input, 'warrantyEndDate') || daysFromNow(365),
-            invoiceAmount: readNumber(input, 'invoiceAmount'),
-            purchaseMode: readPurchaseMode(input),
-            storeName: readString(input, 'storeName'),
-            storeAddress: readString(input, 'storeAddress'),
-            pointOfContact: readString(input, 'pointOfContact'),
-            notes: readString(input, 'notes'),
-            documents: attachedDocuments,
-          };
+          const item = await saveWarrantyItem(
+            {
+              productName:
+                readString(input, 'productName') || 'Untitled product',
+              brand: readString(input, 'brand'),
+              category: readString(input, 'category'),
+              purchaseDate: readString(input, 'purchaseDate') || daysFromNow(0),
+              warrantyEndDate:
+                readString(input, 'warrantyEndDate') || daysFromNow(365),
+              invoiceAmount: readNumber(input, 'invoiceAmount'),
+              purchaseMode: readPurchaseMode(input),
+              storeName: readString(input, 'storeName'),
+              storeAddress: readString(input, 'storeAddress'),
+              pointOfContact: readString(input, 'pointOfContact'),
+              notes: readString(input, 'notes'),
+            },
+            attachedDocuments,
+            null,
+          );
 
           setItems((current) => [item, ...current]);
           setSelectedId(item.id);
@@ -725,7 +720,8 @@ export default function Home() {
           properties: {
             itemId: {
               type: 'string',
-              description: 'Warranty item ID returned by search_items or create_item.',
+              description:
+                'Warranty item ID returned by search_items or create_item.',
             },
             documents: {
               type: 'array',
@@ -737,7 +733,8 @@ export default function Home() {
                   name: { type: 'string' },
                   type: {
                     type: 'string',
-                    description: 'MIME type, for example application/pdf or image/jpeg.',
+                    description:
+                      'MIME type, for example application/pdf or image/jpeg.',
                   },
                   size: {
                     type: 'number',
@@ -758,23 +755,21 @@ export default function Home() {
           additionalProperties: false,
         },
         annotations: { readOnlyHint: false, untrustedContentHint: true },
-        execute: (input) => {
+        execute: async (input) => {
           const itemId = readString(input, 'itemId');
           const attachedDocuments = readDocuments(input);
-          let updatedItem: WarrantyItem | null = null;
+          if (attachedDocuments.length === 0) {
+            return { error: 'No valid document data URLs were provided' };
+          }
 
-          setItems((current) =>
-            current.map((item) => {
-              if (item.id !== itemId) return item;
-              updatedItem = {
-                ...item,
-                documents: [...item.documents, ...attachedDocuments],
-              };
-              return updatedItem;
-            }),
-          );
-
+          const updatedItem = await addDocumentsToWarrantyItem(
+            itemId,
+            attachedDocuments,
+          ).catch(() => null);
           if (!updatedItem) return { error: 'Item not found' };
+          setItems((current) =>
+            current.map((item) => (item.id === itemId ? updatedItem : item)),
+          );
           setSelectedId(itemId);
           return serializeItem(updatedItem);
         },
@@ -806,7 +801,9 @@ export default function Home() {
     Promise.all(
       hosts.flatMap((host) =>
         tools.map((tool) =>
-          Promise.resolve(host.registerTool?.(tool, { signal: controller.signal })),
+          Promise.resolve(
+            host.registerTool?.(tool, { signal: controller.signal }),
+          ),
         ),
       ),
     ).catch(() => undefined);
@@ -836,7 +833,9 @@ export default function Home() {
   }, [items, query, statusFilter]);
 
   const selectedItem =
-    items.find((item) => item.id === selectedId) ?? filteredItems[0] ?? items[0];
+    items.find((item) => item.id === selectedId) ??
+    filteredItems[0] ??
+    items[0];
 
   const metrics = useMemo(() => {
     const counts = items.reduce(
@@ -874,7 +873,8 @@ export default function Home() {
   async function handleFiles(files: FileList | null) {
     if (!files) return;
     const acceptedFiles = Array.from(files).filter(
-      (file) => file.type.startsWith('image/') || file.type === 'application/pdf',
+      (file) =>
+        file.type.startsWith('image/') || file.type === 'application/pdf',
     );
     const loaded = await Promise.all(
       acceptedFiles.map(
@@ -918,41 +918,40 @@ export default function Home() {
     setIsFormOpen(true);
   }
 
-  function handleSubmit(event: { preventDefault: () => void }) {
+  async function handleSubmit(event: { preventDefault: () => void }) {
     event.preventDefault();
-    const normalized: WarrantyItem = {
-      ...form,
-      productName: form.productName.trim(),
-      brand: form.brand.trim(),
-      category: form.category.trim(),
-      storeName: form.storeName.trim(),
-      storeAddress: form.storeAddress.trim(),
-      pointOfContact: form.pointOfContact.trim(),
-      notes: form.notes.trim(),
-      invoiceAmount: Number(form.invoiceAmount) || 0,
-      documents,
-      id: editingId ?? crypto.randomUUID(),
-    };
+    setIsSaving(true);
+    setLoadError('');
 
-    if (editingId) {
+    try {
+      const savedItem = await saveWarrantyItem(form, documents, editingId);
       setItems((current) =>
-        current.map((item) => (item.id === editingId ? normalized : item)),
+        editingId
+          ? current.map((item) => (item.id === editingId ? savedItem : item))
+          : [savedItem, ...current],
       );
-    } else {
-      setItems((current) => [normalized, ...current]);
+      setSelectedId(savedItem.id);
+      resetForm();
+      setIsFormOpen(false);
+    } catch {
+      setLoadError('Unable to save this warranty item. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
-
-    setSelectedId(normalized.id);
-    resetForm();
-    setIsFormOpen(false);
   }
 
-  function removeItem(itemId: string) {
-    setItems((current) => {
-      const next = current.filter((item) => item.id !== itemId);
-      setSelectedId(next[0]?.id ?? '');
-      return next;
-    });
+  async function removeItem(itemId: string) {
+    setLoadError('');
+    try {
+      await deleteWarrantyItem(itemId);
+      setItems((current) => {
+        const next = current.filter((item) => item.id !== itemId);
+        setSelectedId(next[0]?.id ?? '');
+        return next;
+      });
+    } catch {
+      setLoadError('Unable to delete this warranty item. Please try again.');
+    }
   }
 
   function removeDocument(docId: string) {
@@ -967,7 +966,9 @@ export default function Home() {
             <ShieldCheck className="size-6" />
           </div>
           <h1 className="text-xl font-semibold">Warranty Vault</h1>
-          <p className="mt-1 text-sm text-slate-500">Loading your coverage dashboard</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Loading your coverage dashboard
+          </p>
         </div>
       </main>
     );
@@ -1010,6 +1011,12 @@ export default function Home() {
             </Button>
           </div>
         </header>
+
+        {loadError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {loadError}
+          </div>
+        ) : null}
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
@@ -1190,14 +1197,18 @@ export default function Home() {
                 <Field label="Brand">
                   <Input
                     value={form.brand}
-                    onChange={(event) => updateForm('brand', event.target.value)}
+                    onChange={(event) =>
+                      updateForm('brand', event.target.value)
+                    }
                     placeholder="Apple"
                   />
                 </Field>
                 <Field label="Category">
                   <Input
                     value={form.category}
-                    onChange={(event) => updateForm('category', event.target.value)}
+                    onChange={(event) =>
+                      updateForm('category', event.target.value)
+                    }
                     placeholder="Laptop, appliance, phone"
                   />
                 </Field>
@@ -1259,13 +1270,21 @@ export default function Home() {
                     ))}
                   </div>
                 </Field>
-                <Field label={form.purchaseMode === 'online' ? 'Platform' : 'Store name'}>
+                <Field
+                  label={
+                    form.purchaseMode === 'online' ? 'Platform' : 'Store name'
+                  }
+                >
                   <Input
                     value={form.storeName}
                     onChange={(event) =>
                       updateForm('storeName', event.target.value)
                     }
-                    placeholder={form.purchaseMode === 'online' ? 'Amazon, Apple, Best Buy' : 'Store name'}
+                    placeholder={
+                      form.purchaseMode === 'online'
+                        ? 'Amazon, Apple, Best Buy'
+                        : 'Store name'
+                    }
                   />
                 </Field>
               </div>
@@ -1309,7 +1328,7 @@ export default function Home() {
                     Upload invoices, manuals, warranty cards, and product images
                   </span>
                   <span className="mt-1 text-xs text-slate-500">
-                    PDF and image files are saved in this browser for the prototype.
+                    PDF and image files are stored with this warranty item.
                   </span>
                   <Input
                     id="document-upload"
@@ -1348,9 +1367,14 @@ export default function Home() {
                 <Button
                   type="submit"
                   className="bg-emerald-700 text-white hover:bg-emerald-800"
+                  disabled={isSaving}
                 >
                   <ShieldCheck className="size-4" />
-                  {editingId ? 'Save Changes' : 'Save Product'}
+                  {isSaving
+                    ? 'Saving...'
+                    : editingId
+                      ? 'Save Changes'
+                      : 'Save Product'}
                 </Button>
               </div>
             </form>
@@ -1427,7 +1451,9 @@ function WarrantyRow({
           className="min-w-0 flex-1 text-left"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-semibold">{item.productName}</h3>
+            <h3 className="truncate text-base font-semibold">
+              {item.productName}
+            </h3>
             <StatusBadge status={status} />
           </div>
           <p className="mt-1 text-sm text-slate-500">
@@ -1435,13 +1461,22 @@ function WarrantyRow({
           </p>
         </button>
         <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-4 2xl:w-[430px] 2xl:shrink-0">
-          <MiniFact label="Remaining" value={formatRemaining(item.warrantyEndDate)} />
+          <MiniFact
+            label="Remaining"
+            value={formatRemaining(item.warrantyEndDate)}
+          />
           <MiniFact label="Ends" value={formatDate(item.warrantyEndDate)} />
           <MiniFact label="Invoice" value={formatMoney(item.invoiceAmount)} />
           <MiniFact label="Docs" value={String(item.documents.length)} />
         </div>
         <div className="flex gap-1">
-          <Button type="button" variant="ghost" size="icon" aria-label="Edit item" onClick={onEdit}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Edit item"
+            onClick={onEdit}
+          >
             <Edit3 className="size-4" />
           </Button>
           <Button
@@ -1482,15 +1517,33 @@ function ItemDetail({
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
         </div>
-        <Button type="button" variant="outline" size="icon" aria-label="Edit item" onClick={onEdit}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="Edit item"
+          onClick={onEdit}
+        >
           <Edit3 className="size-4" />
         </Button>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <DetailTile icon={<CalendarDays />} label="Purchased" value={formatDate(item.purchaseDate)} />
-        <DetailTile icon={<Clock />} label="Warranty" value={formatRemaining(item.warrantyEndDate)} />
-        <DetailTile icon={<FileText />} label="Invoice" value={formatMoney(item.invoiceAmount)} />
+        <DetailTile
+          icon={<CalendarDays />}
+          label="Purchased"
+          value={formatDate(item.purchaseDate)}
+        />
+        <DetailTile
+          icon={<Clock />}
+          label="Warranty"
+          value={formatRemaining(item.warrantyEndDate)}
+        />
+        <DetailTile
+          icon={<FileText />}
+          label="Invoice"
+          value={formatMoney(item.invoiceAmount)}
+        />
         <DetailTile
           icon={item.purchaseMode === 'online' ? <Laptop /> : <Store />}
           label="Source"
@@ -1499,7 +1552,9 @@ function ItemDetail({
       </div>
 
       <div className="mt-5 space-y-4 text-sm">
-        <InfoBlock label={item.purchaseMode === 'online' ? 'Platform' : 'Store'}>
+        <InfoBlock
+          label={item.purchaseMode === 'online' ? 'Platform' : 'Store'}
+        >
           {item.storeName || 'Not recorded'}
         </InfoBlock>
         {item.purchaseMode === 'offline' ? (
@@ -1532,8 +1587,8 @@ function ItemDetail({
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
-            Add invoices, manuals, warranty cards, or product images when editing
-            this item.
+            Add invoices, manuals, warranty cards, or product images when
+            editing this item.
           </div>
         )}
       </div>
@@ -1558,7 +1613,9 @@ function StatusBadge({ status }: { status: WarrantyStatus }) {
 function MiniFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <p className="text-[11px] font-medium uppercase text-slate-400">{label}</p>
+      <p className="text-[11px] font-medium uppercase text-slate-400">
+        {label}
+      </p>
       <p className="truncate font-semibold text-slate-800">{value}</p>
     </div>
   );
@@ -1595,7 +1652,9 @@ function InfoBlock({
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-semibold uppercase text-slate-400">{label}</p>
+      <p className="mb-1 text-xs font-semibold uppercase text-slate-400">
+        {label}
+      </p>
       <p className="rounded-lg bg-slate-50 p-3 text-slate-700">{children}</p>
     </div>
   );
@@ -1633,6 +1692,8 @@ function DocumentChip({
   onRemove?: () => void;
 }) {
   const isImage = doc.type.startsWith('image/');
+  const previewSource = doc.dataUrl ?? doc.url ?? '';
+  const downloadSource = doc.downloadUrl ?? doc.dataUrl ?? doc.url ?? '#';
   return (
     <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
       <button
@@ -1643,7 +1704,7 @@ function DocumentChip({
       >
         {isImage ? (
           <Image
-            src={doc.dataUrl}
+            src={previewSource}
             alt=""
             width={44}
             height={44}
@@ -1659,7 +1720,7 @@ function DocumentChip({
         <p className="text-xs text-slate-500">{fileSize(doc.size)}</p>
       </div>
       <a
-        href={doc.dataUrl}
+        href={downloadSource}
         download={doc.name}
         className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
         aria-label={`Download ${doc.name}`}
@@ -1689,12 +1750,18 @@ function DocumentPreview({
 }) {
   const isImage = doc.type.startsWith('image/');
   const isPdf = doc.type === 'application/pdf';
+  const previewSource = doc.dataUrl ?? doc.url ?? '';
+  const downloadSource = doc.downloadUrl ?? doc.dataUrl ?? doc.url ?? '#';
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/70 p-3 backdrop-blur-sm">
       <div className="mx-auto flex h-full max-w-5xl flex-col rounded-lg bg-white shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-3">
           <div className="flex min-w-0 items-center gap-2">
-            {isImage ? <ImageIcon className="size-5" /> : <FileText className="size-5" />}
+            {isImage ? (
+              <ImageIcon className="size-5" />
+            ) : (
+              <FileText className="size-5" />
+            )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{doc.name}</p>
               <p className="text-xs text-slate-500">{fileSize(doc.size)}</p>
@@ -1702,14 +1769,20 @@ function DocumentPreview({
           </div>
           <div className="flex gap-1">
             <a
-              href={doc.dataUrl}
+              href={downloadSource}
               download={doc.name}
               className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium hover:bg-slate-100"
             >
               <Download className="size-4" />
               Download
             </a>
-            <Button type="button" variant="ghost" size="icon" aria-label="Close preview" onClick={onClose}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Close preview"
+              onClick={onClose}
+            >
               <X className="size-4" />
             </Button>
           </div>
@@ -1717,7 +1790,7 @@ function DocumentPreview({
         <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-100 p-3">
           {isImage ? (
             <Image
-              src={doc.dataUrl}
+              src={previewSource}
               alt={doc.name}
               width={1000}
               height={760}
@@ -1727,13 +1800,14 @@ function DocumentPreview({
           ) : null}
           {isPdf ? (
             <object
-              data={doc.dataUrl}
+              data={previewSource}
               type="application/pdf"
               className="h-full w-full rounded-lg bg-white"
               aria-label={doc.name}
             >
               <p className="p-6 text-center text-sm text-slate-600">
-                PDF preview is unavailable in this browser. Use download instead.
+                PDF preview is unavailable in this browser. Use download
+                instead.
               </p>
             </object>
           ) : null}
