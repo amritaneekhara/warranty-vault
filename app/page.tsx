@@ -103,6 +103,7 @@ declare global {
 }
 
 const storageKey = 'warranty-vault-items-v1';
+const voltasAcWarrantyItemId = 'voltas-ac-complete-protection-1041641402';
 
 const emptyForm: WarrantyForm = {
   productName: '',
@@ -232,6 +233,7 @@ function daysFromNow(days: number) {
 
 function createSampleItems(): WarrantyItem[] {
   return [
+    createVoltasAcWarrantyItem(),
     {
       id: 'sample-laptop',
       productName: 'MacBook Pro 14',
@@ -280,6 +282,34 @@ function createSampleItems(): WarrantyItem[] {
   ];
 }
 
+function createVoltasAcWarrantyItem(): WarrantyItem {
+  return {
+    id: voltasAcWarrantyItemId,
+    productName: 'Voltas 2024 Model 1.5 Ton 5 Star Split Inverter AC - White',
+    brand: 'Voltas',
+    category: 'Air Conditioner',
+    purchaseDate: '2025-06-14',
+    warrantyEndDate: '2028-06-12',
+    invoiceAmount: 0,
+    purchaseMode: 'online',
+    storeName: 'Flipkart',
+    storeAddress: '',
+    pointOfContact: 'OneAssist: 18001233330, happytoassist@oneassist.in',
+    notes:
+      'Complete Appliance Protection (3 years). Plan ID: 1041641402. Device model: 185V CAS(4503690). Device serial numbers: 4553510A25AK00517, 4513555E24LB35979. Includes 3-year coverage, accidental damage and surge protection, one preventive maintenance/cleaning service, and one gas top-up during the 2nd or 3rd year.',
+    documents: [
+      {
+        id: 'doc-cap-ac-1041641402',
+        name: 'cap-ac-TnC-1041641402--.pdf',
+        type: 'application/pdf',
+        size: 55699,
+        dataUrl: '/cap-ac-TnC-1041641402--.pdf',
+        uploadedAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
+  };
+}
+
 function migrateStoredItems(items: WarrantyItem[]) {
   const sampleRupeeAmounts: Record<string, number> = {
     'sample-laptop': 199900,
@@ -287,11 +317,20 @@ function migrateStoredItems(items: WarrantyItem[]) {
     'sample-washer': 74900,
   };
 
-  return items.map((item) =>
+  const migratedItems = items.map((item) =>
     sampleRupeeAmounts[item.id] && item.invoiceAmount < 10000
       ? { ...item, invoiceAmount: sampleRupeeAmounts[item.id] }
       : item,
   );
+
+  const hasVoltasAc = migratedItems.some(
+    (item) =>
+      item.id === voltasAcWarrantyItemId ||
+      item.notes.includes('1041641402') ||
+      item.productName.includes('Voltas 2024 Model 1.5 Ton 5 Star Split Inverter AC'),
+  );
+
+  return hasVoltasAc ? migratedItems : [createVoltasAcWarrantyItem(), ...migratedItems];
 }
 
 function getRemainingDays(endDate: string) {
