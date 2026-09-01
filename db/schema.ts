@@ -33,5 +33,4 @@ export const warrantySchemaSql = [
     ON warranty_documents(user_id, item_id)`,
   `CREATE INDEX IF NOT EXISTS idx_warranty_documents_user_id
     ON warranty_documents(user_id)`,
-  `PRAGMA optimize`,
 ];

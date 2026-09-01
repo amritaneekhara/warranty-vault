@@ -220,9 +220,18 @@ function readDocuments(input: Record<string, unknown>) {
 }
 
 async function loadWarrantyItems() {
-  const response = await fetch('/api/warranties', { cache: 'no-store' });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  const response = await fetch('/api/warranties', {
+    cache: 'no-store',
+    signal: controller.signal,
+  }).finally(() => window.clearTimeout(timeout));
   if (!response.ok) throw new Error('Unable to load warranty items');
-  const payload = (await response.json()) as { items?: WarrantyItem[] };
+  const payload = (await response.json()) as {
+    items?: WarrantyItem[];
+    warning?: string;
+  };
+  if (payload.warning) throw new Error(payload.warning);
   return payload.items ?? [];
 }
 

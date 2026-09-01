@@ -100,9 +100,12 @@ export function getUserId(request: Request) {
 export async function ensureSchema() {
   if (!schemaReady) {
     const { DB } = getBindings();
-    schemaReady = DB.batch(
-      warrantySchemaSql.map((sql) => DB.prepare(sql)),
-    ).then(() => undefined);
+    schemaReady = warrantySchemaSql
+      .reduce(
+        (previous, sql) => previous.then(() => DB.prepare(sql).run()),
+        Promise.resolve() as Promise<unknown>,
+      )
+      .then(() => undefined);
   }
 
   await schemaReady;
