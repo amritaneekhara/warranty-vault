@@ -89,9 +89,12 @@ declare global {
 
   interface Window {
     __warrantyVaultWebMCP?: {
+      status?: string;
       tools: WebMcpTool[];
+      listTools?: () => WebMcpTool[];
       executeTool: (name: string, input?: Record<string, unknown>) => unknown;
     };
+    warrantyVaultAgent?: Window['__warrantyVaultWebMCP'];
   }
 }
 
@@ -785,25 +788,28 @@ export default function Home() {
       },
     ];
 
+    const hosts = [document.modelContext, navigator.modelContext].filter(
+      (host, index, allHosts): host is WebMcpHost =>
+        Boolean(host?.registerTool) && allHosts.indexOf(host) === index,
+    );
     const tools = buildTools();
     window.__warrantyVaultWebMCP = {
+      status: hosts.length > 0 ? 'registered' : 'page-bridge-ready',
       tools,
+      listTools: () => tools,
       executeTool: (name, input = {}) => {
         const tool = tools.find((entry) => entry.name === name);
         if (!tool) return { error: `Unknown tool: ${name}` };
         return tool.execute(input);
       },
     };
-
-    const hosts = [document.modelContext, navigator.modelContext].filter(
-      (host, index, allHosts): host is WebMcpHost =>
-        Boolean(host?.registerTool) && allHosts.indexOf(host) === index,
-    );
+    window.warrantyVaultAgent = window.__warrantyVaultWebMCP;
 
     if (hosts.length === 0) {
       return () => {
         controller.abort();
         delete window.__warrantyVaultWebMCP;
+        delete window.warrantyVaultAgent;
       };
     }
 
@@ -820,6 +826,7 @@ export default function Home() {
     return () => {
       controller.abort();
       delete window.__warrantyVaultWebMCP;
+      delete window.warrantyVaultAgent;
     };
   }, [isReady, startAdd]);
 

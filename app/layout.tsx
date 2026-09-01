@@ -28,6 +28,21 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.__warrantyVaultWebMCP = window.__warrantyVaultWebMCP || {
+                status: 'booting',
+                tools: [],
+                listTools: function () { return this.tools; },
+                executeTool: function () {
+                  return { error: 'Warranty Vault tools are still loading.' };
+                }
+              };
+              window.warrantyVaultAgent = window.__warrantyVaultWebMCP;
+            `,
+          }}
+        />
         {children}
       </body>
     </html>
