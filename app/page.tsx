@@ -1081,9 +1081,9 @@ export default function Home() {
 
   if (!isReady) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,#e7f8f1_0,#f7faf7_34%,#f6f3ee_100%)] text-slate-950">
-        <div className="rounded-lg border border-slate-200 bg-white/88 p-6 text-center shadow-sm">
-          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-lg bg-emerald-700 text-white shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-slate-950">
+        <div className="rounded-lg border border-white/70 bg-white/82 p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm">
             <ShieldCheck className="size-6" />
           </div>
           <h1 className="text-xl font-semibold">Warranty Vault</h1>
@@ -1096,18 +1096,18 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e7f8f1_0,#f7faf7_34%,#f6f3ee_100%)] text-slate-950">
+    <main className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-slate-950">
       <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 border-b border-slate-200/80 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <header className="flex flex-col gap-4 rounded-lg border border-white/70 bg-white/72 px-4 py-4 shadow-[0_22px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-lg bg-emerald-700 text-white shadow-sm">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm">
               <ShieldCheck className="size-6" />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase text-emerald-700">
                 Personal coverage command center
               </p>
-              <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
                 Warranty Vault
               </h1>
             </div>
@@ -1119,13 +1119,13 @@ export default function Home() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search products, stores, contacts"
-                className="h-10 rounded-lg border-slate-300 bg-white/85 pl-9"
+                className="h-11 rounded-lg border-white/70 bg-white/92 pl-9 shadow-sm"
               />
             </div>
             <Button
               type="button"
               onClick={startAdd}
-              className="h-10 bg-emerald-700 px-4 text-white hover:bg-emerald-800"
+              className="h-11 rounded-lg bg-slate-950 px-4 text-white shadow-sm hover:bg-slate-800"
             >
               <Plus className="size-4" />
               Add Product
@@ -1169,10 +1169,10 @@ export default function Home() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="flex min-w-0 flex-col gap-5">
-            <section className="min-w-0 rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
+            <section className="min-w-0 rounded-lg border border-white/70 bg-white/78 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.07)] backdrop-blur-xl">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">Warranty portfolio</h2>
+                  <h2 className="text-lg font-semibold text-slate-950">Warranty portfolio</h2>
                   <p className="text-sm text-slate-500">
                     Sort your products by coverage urgency.
                   </p>
@@ -1184,10 +1184,10 @@ export default function Home() {
                         key={status}
                         type="button"
                         onClick={() => setStatusFilter(status)}
-                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium capitalize transition ${
+                        className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition ${
                           statusFilter === status
-                            ? 'border-emerald-700 bg-emerald-700 text-white'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-400'
+                            ? 'border-slate-950 bg-slate-950 text-white shadow-sm'
+                            : 'border-white/80 bg-white/80 text-slate-600 shadow-sm hover:border-emerald-300'
                         }`}
                       >
                         {status}
@@ -1198,7 +1198,7 @@ export default function Home() {
               </div>
 
               {filteredItems.length === 0 ? (
-                <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 p-8 text-center">
                   <PackageCheck className="mb-3 size-10 text-slate-400" />
                   <h3 className="text-base font-semibold">No items found</h3>
                   <p className="mt-1 max-w-sm text-sm text-slate-500">
@@ -1208,7 +1208,7 @@ export default function Home() {
                   <Button
                     type="button"
                     onClick={startAdd}
-                    className="mt-4 bg-emerald-700 text-white hover:bg-emerald-800"
+                    className="mt-4 rounded-lg bg-slate-950 text-white hover:bg-slate-800"
                   >
                     <Plus className="size-4" />
                     Add Product
@@ -1230,7 +1230,7 @@ export default function Home() {
               )}
             </section>
 
-            <section className="min-w-0 rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
+            <section className="min-w-0 rounded-lg border border-white/70 bg-white/72 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-xl">
               <h2 className="text-lg font-semibold">Next expirations</h2>
               <div className="mt-4 flex h-60 justify-center overflow-hidden">
                 <BarChart
@@ -1256,7 +1256,7 @@ export default function Home() {
             </section>
           </div>
 
-          <aside className="rounded-lg border border-slate-200 bg-white/92 p-4 shadow-sm">
+          <aside className="rounded-lg border border-white/70 bg-white/82 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur-xl xl:sticky xl:top-4 xl:self-start">
             {selectedItem ? (
               <ItemDetail
                 item={selectedItem}
@@ -1524,10 +1524,10 @@ function MetricCard({
   tone?: 'emerald' | 'amber';
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white/88 p-4 shadow-sm">
+    <div className="rounded-lg border border-white/70 bg-white/78 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(15,23,42,0.09)]">
       <div className="flex items-center justify-between gap-3">
         <div
-          className={`flex size-10 items-center justify-center rounded-lg ${
+          className={`flex size-10 items-center justify-center rounded-lg shadow-sm ${
             tone === 'amber'
               ? 'bg-amber-100 text-amber-700'
               : 'bg-emerald-100 text-emerald-700'
@@ -1535,9 +1535,13 @@ function MetricCard({
         >
           {icon}
         </div>
-        <span className="text-xs font-medium text-slate-500">{label}</span>
+        <span className="text-xs font-semibold uppercase text-slate-400">
+          {label}
+        </span>
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-normal">{value}</p>
+      <p className="mt-4 text-3xl font-semibold tracking-normal text-slate-950">
+        {value}
+      </p>
       <p className="mt-1 text-sm text-slate-500">{detail}</p>
     </div>
   );
@@ -1579,10 +1583,10 @@ function WarrantyRow({
   };
   return (
     <article
-      className={`min-w-0 overflow-hidden rounded-lg border bg-white p-3 transition ${
+      className={`min-w-0 overflow-hidden rounded-lg border p-4 transition ${
         isSelected
-          ? 'border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]'
-          : 'border-slate-200 hover:border-emerald-300'
+          ? 'border-emerald-400 bg-emerald-50/70 shadow-[0_0_0_3px_rgba(16,185,129,0.10)]'
+          : 'border-white/70 bg-white/82 shadow-sm hover:border-emerald-200 hover:bg-white'
       }`}
     >
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1601,7 +1605,7 @@ function WarrantyRow({
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
           <div className="mt-3">
-            <div className={`h-2 rounded-full ${trackStyles[status]}`}>
+            <div className={`h-2 overflow-hidden rounded-full ${trackStyles[status]}`}>
               <div
                 className={`h-full rounded-full ${barStyles[status]}`}
                 style={{ width: `${coveragePercent}%` }}
@@ -1637,7 +1641,7 @@ function WarrantyRow({
             </div>
           </div>
         </button>
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 gap-1 self-start rounded-lg bg-white/70 p-1 shadow-sm">
           <Button
             type="button"
             variant="ghost"
@@ -1675,7 +1679,7 @@ function ItemDetail({
   const status = getStatus(item.warrantyEndDate);
   return (
     <div>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 pb-4">
         <div>
           <StatusBadge status={status} />
           <h2 className="mt-3 text-2xl font-semibold tracking-normal">
@@ -1721,8 +1725,8 @@ function ItemDetail({
 
       <div className="mt-6">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold">Documents</h3>
-          <span className="text-xs text-slate-500">
+          <h3 className="font-semibold text-slate-950">Documents</h3>
+          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
             {item.documents.length} saved
           </span>
         </div>
@@ -1737,7 +1741,7 @@ function ItemDetail({
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white/60 p-5 text-center text-sm text-slate-500">
             Add invoices, manuals, warranty cards, or product images when
             editing this item.
           </div>
@@ -1788,11 +1792,11 @@ function DetailTile({
   value: string;
 }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-white text-emerald-700">
+    <div className="rounded-lg border border-white/80 bg-white/70 p-3 shadow-sm">
+      <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
         {icon}
       </div>
-      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="text-xs font-semibold uppercase text-slate-400">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold capitalize text-slate-900">
         {value}
       </p>
@@ -1812,7 +1816,9 @@ function InfoBlock({
       <p className="mb-1 text-xs font-semibold uppercase text-slate-400">
         {label}
       </p>
-      <p className="rounded-lg bg-slate-50 p-3 text-slate-700">{children}</p>
+      <p className="rounded-lg border border-white/80 bg-white/70 p-3 text-slate-700 shadow-sm">
+        {children}
+      </p>
     </div>
   );
 }
@@ -1848,7 +1854,7 @@ function CollapsibleNotes({
         ) : null}
       </div>
       <p
-        className={`rounded-lg bg-slate-50 p-3 text-slate-700 ${
+        className={`rounded-lg border border-white/80 bg-white/70 p-3 text-slate-700 shadow-sm ${
           shouldCollapse && !isExpanded
             ? 'max-h-24 overflow-hidden [mask-image:linear-gradient(180deg,#000_70%,transparent)]'
             : ''
@@ -1895,11 +1901,11 @@ function DocumentChip({
   const previewSource = doc.dataUrl ?? doc.url ?? '';
   const downloadSource = doc.downloadUrl ?? doc.dataUrl ?? doc.url ?? '#';
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
+    <div className="flex items-center gap-3 rounded-lg border border-white/80 bg-white/76 p-2 shadow-sm transition hover:border-emerald-200 hover:bg-white">
       <button
         type="button"
         onClick={onPreview}
-        className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-500"
+        className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-500 shadow-inner"
         aria-label={`Preview ${doc.name}`}
       >
         {isImage ? (
@@ -1916,13 +1922,15 @@ function DocumentChip({
         )}
       </button>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{doc.name}</p>
+        <p className="truncate text-sm font-semibold text-slate-900">
+          {doc.name}
+        </p>
         <p className="text-xs text-slate-500">{fileSize(doc.size)}</p>
       </div>
       <a
         href={downloadSource}
         download={doc.name}
-        className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+        className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
         aria-label={`Download ${doc.name}`}
       >
         <Download className="size-4" />
