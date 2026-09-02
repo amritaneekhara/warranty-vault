@@ -1581,6 +1581,9 @@ function AboutSection() {
             when something breaks and you need dates, proof, and next steps
             fast.
           </p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Product manager: Amrita Neekhara
+          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {highlights.map((item) => (
