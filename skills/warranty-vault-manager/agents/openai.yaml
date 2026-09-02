@@ -1,0 +1,3 @@
+display_name: Warranty Vault Manager
+short_description: Register and maintain product warranties from Gmail in Warranty Vault.
+default_prompt: Register or update a product warranty from Gmail in Warranty Vault, including invoice and policy supporting documents.
