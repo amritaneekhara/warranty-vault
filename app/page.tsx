@@ -371,6 +371,21 @@ function formatDate(value: string) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function getCoveragePercent(item: WarrantyItem) {
+  const start = new Date(`${item.purchaseDate}T00:00:00`).getTime();
+  const end = new Date(`${item.warrantyEndDate}T00:00:00`).getTime();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return getStatus(item.warrantyEndDate) === 'expired' ? 100 : 0;
+  }
+  const elapsed = today.getTime() - start;
+  return Math.min(
+    100,
+    Math.max(0, Math.round((elapsed / (end - start)) * 100)),
+  );
+}
+
 function fileSize(size: number) {
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
@@ -1542,6 +1557,26 @@ function WarrantyRow({
   onDelete: () => void;
 }) {
   const status = getStatus(item.warrantyEndDate);
+  const coveragePercent = getCoveragePercent(item);
+  const documentsLabel =
+    item.documents.length === 1
+      ? '1 proof saved'
+      : `${item.documents.length} proofs saved`;
+  const barStyles = {
+    active: 'bg-emerald-500',
+    expiring: 'bg-amber-500',
+    expired: 'bg-red-500',
+  };
+  const trackStyles = {
+    active: 'bg-emerald-100',
+    expiring: 'bg-amber-100',
+    expired: 'bg-red-100',
+  };
+  const healthLabel = {
+    active: 'Healthy coverage',
+    expiring: 'Watch soon',
+    expired: 'Expired',
+  };
   return (
     <article
       className={`min-w-0 overflow-hidden rounded-lg border bg-white p-3 transition ${
@@ -1550,7 +1585,7 @@ function WarrantyRow({
           : 'border-slate-200 hover:border-emerald-300'
       }`}
     >
-      <div className="flex min-w-0 flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <button
           type="button"
           onClick={onSelect}
@@ -1565,16 +1600,43 @@ function WarrantyRow({
           <p className="mt-1 min-w-0 text-sm text-slate-500 break-words [overflow-wrap:anywhere]">
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
+          <div className="mt-3">
+            <div className={`h-2 rounded-full ${trackStyles[status]}`}>
+              <div
+                className={`h-full rounded-full ${barStyles[status]}`}
+                style={{ width: `${coveragePercent}%` }}
+              />
+            </div>
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span className="font-semibold text-slate-800">
+                {formatRemaining(item.warrantyEndDate)}
+              </span>
+              <span className="text-slate-500">
+                Covered until {formatDate(item.warrantyEndDate)}
+              </span>
+            </div>
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <ShieldCheck className="size-3.5 shrink-0 text-emerald-700" />
+                {healthLabel[status]}
+              </span>
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <FileText className="size-3.5 shrink-0 text-slate-400" />
+                {formatMoney(item.invoiceAmount)} invoice
+              </span>
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <CheckCircle2
+                  className={`size-3.5 shrink-0 ${
+                    item.documents.length
+                      ? 'text-emerald-700'
+                      : 'text-amber-600'
+                  }`}
+                />
+                {documentsLabel}
+              </span>
+            </div>
+          </div>
         </button>
-        <div className="grid min-w-0 max-w-full grid-cols-2 gap-2 text-sm sm:grid-cols-4 2xl:w-[430px] 2xl:shrink-0">
-          <MiniFact
-            label="Remaining"
-            value={formatRemaining(item.warrantyEndDate)}
-          />
-          <MiniFact label="Ends" value={formatDate(item.warrantyEndDate)} />
-          <MiniFact label="Invoice" value={formatMoney(item.invoiceAmount)} />
-          <MiniFact label="Docs" value={String(item.documents.length)} />
-        </div>
         <div className="flex shrink-0 gap-1">
           <Button
             type="button"
@@ -1714,17 +1776,6 @@ function StatusBadge({ status }: { status: WarrantyStatus }) {
     expired: 'Expired',
   };
   return <Badge className={styles[status]}>{labels[status]}</Badge>;
-}
-
-function MiniFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2">
-      <p className="truncate text-[11px] font-medium uppercase text-slate-400">
-        {label}
-      </p>
-      <p className="min-w-0 truncate font-semibold text-slate-800">{value}</p>
-    </div>
-  );
 }
 
 function DetailTile({
