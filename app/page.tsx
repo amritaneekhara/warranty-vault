@@ -1544,7 +1544,7 @@ function WarrantyRow({
   const status = getStatus(item.warrantyEndDate);
   return (
     <article
-      className={`rounded-lg border bg-white p-3 transition ${
+      className={`min-w-0 overflow-hidden rounded-lg border bg-white p-3 transition ${
         isSelected
           ? 'border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]'
           : 'border-slate-200 hover:border-emerald-300'
@@ -1556,17 +1556,17 @@ function WarrantyRow({
           onClick={onSelect}
           className="min-w-0 flex-1 text-left"
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-semibold">
+          <div className="flex min-w-0 flex-wrap items-start gap-2">
+            <h3 className="min-w-0 flex-1 text-base font-semibold leading-snug break-words [overflow-wrap:anywhere]">
               {item.productName}
             </h3>
             <StatusBadge status={status} />
           </div>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 min-w-0 text-sm text-slate-500 break-words [overflow-wrap:anywhere]">
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
         </button>
-        <div className="grid min-w-0 grid-cols-2 gap-2 text-sm sm:grid-cols-4 2xl:w-[430px] 2xl:shrink-0">
+        <div className="grid min-w-0 max-w-full grid-cols-2 gap-2 text-sm sm:grid-cols-4 2xl:w-[430px] 2xl:shrink-0">
           <MiniFact
             label="Remaining"
             value={formatRemaining(item.warrantyEndDate)}
@@ -1575,7 +1575,7 @@ function WarrantyRow({
           <MiniFact label="Invoice" value={formatMoney(item.invoiceAmount)} />
           <MiniFact label="Docs" value={String(item.documents.length)} />
         </div>
-        <div className="flex gap-1">
+        <div className="flex shrink-0 gap-1">
           <Button
             type="button"
             variant="ghost"
@@ -1718,11 +1718,11 @@ function StatusBadge({ status }: { status: WarrantyStatus }) {
 
 function MiniFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <p className="text-[11px] font-medium uppercase text-slate-400">
+    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2">
+      <p className="truncate text-[11px] font-medium uppercase text-slate-400">
         {label}
       </p>
-      <p className="truncate font-semibold text-slate-800">{value}</p>
+      <p className="min-w-0 truncate font-semibold text-slate-800">{value}</p>
     </div>
   );
 }
