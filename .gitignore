@@ -36,3 +36,12 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# local warranty documents and uploaded proof files
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+!public/favicon.svg
