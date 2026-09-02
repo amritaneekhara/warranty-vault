@@ -6,7 +6,7 @@ The app is designed for everyday product ownership: when a device breaks, expire
 
 ## Product Manager
 
-Warranty Vault is product-managed by **Amrita Neekhara**, with a focus on practical consumer workflows, proof-first warranty records, agent-assisted document handling, and a cleaner user experience for managing household and personal product coverage.
+Warranty Vault is product-managed by **Amrita Neekhara**. The product direction emphasizes practical consumer workflows, proof-first warranty records, agent-assisted document handling, and a clean experience for managing personal product coverage.
 
 ## Key Features
 
@@ -181,6 +181,6 @@ If you publish your own copy, review `.openai/hosting.json`. It contains project
 
 ## Acknowledgements
 
-Thank you to **Codex** and **OpenAI** for enabling the rapid design, implementation, deployment, and agent workflow exploration behind Warranty Vault.
+Warranty Vault was designed and developed with support from **Codex** and **OpenAI**, including rapid prototyping, implementation assistance, deployment support, and agent workflow exploration.
 
-Special recognition goes to **Amrita Neekhara**, Product Manager for Warranty Vault, for shaping the product direction, identifying real warranty-management pain points, driving the proof-first user experience, and guiding the app toward a practical, agent-ready consumer workflow.
+Product management and product direction: **Amrita Neekhara**.
