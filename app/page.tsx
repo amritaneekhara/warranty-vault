@@ -1274,6 +1274,8 @@ export default function Home() {
             )}
           </aside>
         </section>
+
+        <AboutSection />
       </div>
 
       {isFormOpen ? (
@@ -1544,6 +1546,59 @@ function MetricCard({
       </p>
       <p className="mt-1 text-sm text-slate-500">{detail}</p>
     </div>
+  );
+}
+
+function AboutSection() {
+  const highlights = [
+    {
+      title: 'Warranty memory',
+      body: 'Keep purchase dates, expiry dates, invoices, warranty cards, manuals, and registration notes together.',
+    },
+    {
+      title: 'Proof-first records',
+      body: 'Documents stay attached to each product, so claim evidence is visible before long notes or service history.',
+    },
+    {
+      title: 'Assistant-ready',
+      body: 'The project includes a Warranty Vault Manager skill for guided agent workflows from email, invoices, and policy pages.',
+    },
+  ];
+
+  return (
+    <section className="rounded-lg border border-white/70 bg-slate-950 p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-end">
+        <div>
+          <p className="text-xs font-semibold uppercase text-emerald-300">
+            About Warranty Vault
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-normal sm:text-3xl">
+            A personal coverage desk for everything you own.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+            Warranty Vault turns scattered invoices, warranty cards, manuals,
+            and service contacts into one calm view. It is built for the moment
+            when something breaks and you need dates, proof, and next steps
+            fast.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {highlights.map((item) => (
+            <div
+              key={item.title}
+              className="rounded-lg border border-white/10 bg-white/8 p-4"
+            >
+              <h3 className="text-sm font-semibold text-white">
+                {item.title}
+              </h3>
+              <p className="mt-2 text-xs leading-5 text-slate-300">
+                {item.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
