@@ -1719,23 +1719,6 @@ function ItemDetail({
         />
       </div>
 
-      <div className="mt-5 space-y-4 text-sm">
-        <InfoBlock
-          label={item.purchaseMode === 'online' ? 'Platform' : 'Store'}
-        >
-          {item.storeName || 'Not recorded'}
-        </InfoBlock>
-        {item.purchaseMode === 'offline' ? (
-          <InfoBlock label="Store address">
-            {item.storeAddress || 'Not recorded'}
-          </InfoBlock>
-        ) : null}
-        <InfoBlock label="Point of contact">
-          {item.pointOfContact || 'Not recorded'}
-        </InfoBlock>
-        <InfoBlock label="Notes">{item.notes || 'No notes yet.'}</InfoBlock>
-      </div>
-
       <div className="mt-6">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold">Documents</h3>
@@ -1759,6 +1742,23 @@ function ItemDetail({
             editing this item.
           </div>
         )}
+      </div>
+
+      <div className="mt-5 space-y-4 text-sm">
+        <InfoBlock
+          label={item.purchaseMode === 'online' ? 'Platform' : 'Store'}
+        >
+          {item.storeName || 'Not recorded'}
+        </InfoBlock>
+        {item.purchaseMode === 'offline' ? (
+          <InfoBlock label="Store address">
+            {item.storeAddress || 'Not recorded'}
+          </InfoBlock>
+        ) : null}
+        <InfoBlock label="Point of contact">
+          {item.pointOfContact || 'Not recorded'}
+        </InfoBlock>
+        <CollapsibleNotes itemId={item.id} notes={item.notes} />
       </div>
     </div>
   );
@@ -1813,6 +1813,49 @@ function InfoBlock({
         {label}
       </p>
       <p className="rounded-lg bg-slate-50 p-3 text-slate-700">{children}</p>
+    </div>
+  );
+}
+
+function CollapsibleNotes({
+  itemId,
+  notes,
+}: {
+  itemId: string;
+  notes: string;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const normalizedNotes = notes.trim();
+  const hasNotes = normalizedNotes.length > 0;
+  const shouldCollapse = normalizedNotes.length > 220;
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [itemId]);
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase text-slate-400">Notes</p>
+        {shouldCollapse ? (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+          </button>
+        ) : null}
+      </div>
+      <p
+        className={`rounded-lg bg-slate-50 p-3 text-slate-700 ${
+          shouldCollapse && !isExpanded
+            ? 'max-h-24 overflow-hidden [mask-image:linear-gradient(180deg,#000_70%,transparent)]'
+            : ''
+        }`}
+      >
+        {hasNotes ? normalizedNotes : 'No notes yet.'}
+      </p>
     </div>
   );
 }
