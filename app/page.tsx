@@ -9,11 +9,14 @@ import {
   FileText,
   Image as ImageIcon,
   Laptop,
+  Monitor,
+  Moon,
   PackageCheck,
   Plus,
   Search,
   ShieldCheck,
   Store,
+  Sun,
   Trash2,
   Upload,
   X,
@@ -29,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 type PurchaseMode = 'online' | 'offline';
 type WarrantyStatus = 'active' | 'expiring' | 'expired';
+type ThemePreference = 'light' | 'dark' | 'system';
 
 type WarrantyDocument = {
   id: string;
@@ -111,6 +115,26 @@ const emptyForm: WarrantyForm = {
   pointOfContact: '',
   notes: '',
 };
+
+const themeOptions: {
+  value: ThemePreference;
+  label: string;
+  icon: React.ReactElement;
+}[] = [
+  { value: 'light', label: 'Light', icon: <Sun className="size-4" /> },
+  { value: 'dark', label: 'Dark', icon: <Moon className="size-4" /> },
+  { value: 'system', label: 'System', icon: <Monitor className="size-4" /> },
+];
+
+function applyThemePreference(preference: ThemePreference) {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.classList.toggle(
+    'dark',
+    preference === 'dark' || (preference === 'system' && prefersDark),
+  );
+  document.documentElement.style.colorScheme =
+    preference === 'system' ? (prefersDark ? 'dark' : 'light') : preference;
+}
 
 function createBlankForm(): WarrantyForm {
   return {
@@ -392,6 +416,8 @@ function fileSize(size: number) {
 }
 
 export default function Home() {
+  const [themePreference, setThemePreference] =
+    useState<ThemePreference>('system');
   const [items, setItems] = useState<WarrantyItem[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [query, setQuery] = useState('');
@@ -407,6 +433,28 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const itemsRef = useRef<WarrantyItem[]>([]);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('warranty-vault-theme');
+    const initialTheme =
+      savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system'
+        ? savedTheme
+        : 'system';
+    setThemePreference(initialTheme);
+    applyThemePreference(initialTheme);
+  }, []);
+
+  useEffect(() => {
+    applyThemePreference(themePreference);
+    window.localStorage.setItem('warranty-vault-theme', themePreference);
+
+    if (themePreference !== 'system') return;
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const syncSystemTheme = () => applyThemePreference('system');
+    media.addEventListener('change', syncSystemTheme);
+    return () => media.removeEventListener('change', syncSystemTheme);
+  }, [themePreference]);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -1081,13 +1129,13 @@ export default function Home() {
 
   if (!isReady) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-slate-950">
-        <div className="rounded-lg border border-white/70 bg-white/82 p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(135deg,#0b1220_0%,#111827_52%,#171717_100%)]">
+        <div className="rounded-lg border border-white/70 bg-white/82 p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-card/82 dark:shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
+          <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm dark:bg-emerald-300 dark:text-slate-950">
             <ShieldCheck className="size-6" />
           </div>
           <h1 className="text-xl font-semibold">Warranty Vault</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Loading your coverage dashboard
           </p>
         </div>
@@ -1096,36 +1144,40 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-slate-950">
+    <main className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(135deg,#0b1220_0%,#111827_52%,#171717_100%)]">
       <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 rounded-lg border border-white/70 bg-white/72 px-4 py-4 shadow-[0_22px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+        <header className="flex flex-col gap-4 rounded-lg border border-white/70 bg-white/72 px-4 py-4 shadow-[0_22px_70px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between dark:border-white/10 dark:bg-card/72 dark:shadow-[0_22px_70px_rgba(0,0,0,0.32)]">
           <div className="flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm dark:bg-emerald-300 dark:text-slate-950">
               <ShieldCheck className="size-6" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase text-emerald-700">
+              <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-300">
                 Personal coverage command center
               </p>
-              <h1 className="text-2xl font-semibold tracking-normal text-slate-950 sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-normal text-foreground sm:text-3xl">
                 Warranty Vault
               </h1>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <ThemeToggle
+              value={themePreference}
+              onChange={setThemePreference}
+            />
             <div className="relative min-w-0 sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search products, stores, contacts"
-                className="h-11 rounded-lg border-white/70 bg-white/92 pl-9 shadow-sm"
+                className="h-11 rounded-lg border-white/70 bg-white/92 pl-9 shadow-sm dark:border-white/10 dark:bg-white/8"
               />
             </div>
             <Button
               type="button"
               onClick={startAdd}
-              className="h-11 rounded-lg bg-slate-950 px-4 text-white shadow-sm hover:bg-slate-800"
+              className="h-11 rounded-lg bg-slate-950 px-4 text-white shadow-sm hover:bg-slate-800 dark:bg-emerald-300 dark:text-slate-950 dark:hover:bg-emerald-200"
             >
               <Plus className="size-4" />
               Add Product
@@ -1134,7 +1186,7 @@ export default function Home() {
         </header>
 
         {loadError ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-400/30 dark:bg-red-950/40 dark:text-red-200">
             {loadError}
           </div>
         ) : null}
@@ -1169,11 +1221,11 @@ export default function Home() {
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="flex min-w-0 flex-col gap-5">
-            <section className="min-w-0 rounded-lg border border-white/70 bg-white/78 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.07)] backdrop-blur-xl">
+            <section className="min-w-0 rounded-lg border border-white/70 bg-white/78 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.07)] backdrop-blur-xl dark:border-white/10 dark:bg-card/78 dark:shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-950">Warranty portfolio</h2>
-                  <p className="text-sm text-slate-500">
+                  <h2 className="text-lg font-semibold text-foreground">Warranty portfolio</h2>
+                  <p className="text-sm text-muted-foreground">
                     Sort your products by coverage urgency.
                   </p>
                 </div>
@@ -1186,8 +1238,8 @@ export default function Home() {
                         onClick={() => setStatusFilter(status)}
                         className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition ${
                           statusFilter === status
-                            ? 'border-slate-950 bg-slate-950 text-white shadow-sm'
-                            : 'border-white/80 bg-white/80 text-slate-600 shadow-sm hover:border-emerald-300'
+                            ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-emerald-300 dark:bg-emerald-300 dark:text-slate-950'
+                            : 'border-white/80 bg-white/80 text-slate-600 shadow-sm hover:border-emerald-300 dark:border-white/10 dark:bg-white/8 dark:text-slate-300 dark:hover:border-emerald-300/60'
                         }`}
                       >
                         {status}
@@ -1198,17 +1250,17 @@ export default function Home() {
               </div>
 
               {filteredItems.length === 0 ? (
-                <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 p-8 text-center">
-                  <PackageCheck className="mb-3 size-10 text-slate-400" />
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 p-8 text-center dark:border-white/15 dark:bg-white/5">
+                  <PackageCheck className="mb-3 size-10 text-muted-foreground" />
                   <h3 className="text-base font-semibold">No items found</h3>
-                  <p className="mt-1 max-w-sm text-sm text-slate-500">
+                  <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                     Add a product or adjust your search to bring warranties back
                     into view.
                   </p>
                   <Button
                     type="button"
                     onClick={startAdd}
-                    className="mt-4 rounded-lg bg-slate-950 text-white hover:bg-slate-800"
+                    className="mt-4 rounded-lg bg-slate-950 text-white hover:bg-slate-800 dark:bg-emerald-300 dark:text-slate-950 dark:hover:bg-emerald-200"
                   >
                     <Plus className="size-4" />
                     Add Product
@@ -1230,7 +1282,7 @@ export default function Home() {
               )}
             </section>
 
-            <section className="min-w-0 rounded-lg border border-white/70 bg-white/72 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+            <section className="min-w-0 rounded-lg border border-white/70 bg-white/72 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-white/10 dark:bg-card/72 dark:shadow-[0_20px_60px_rgba(0,0,0,0.26)]">
               <h2 className="text-lg font-semibold">Next expirations</h2>
               <div className="mt-4 flex h-60 justify-center overflow-hidden">
                 <BarChart
@@ -1247,7 +1299,7 @@ export default function Home() {
                     width={150}
                     tickLine={false}
                     axisLine={false}
-                    tick={{ fontSize: 12, fill: '#475569' }}
+                    tick={{ fontSize: 12, fill: 'currentColor' }}
                   />
                   <Tooltip />
                   <Bar dataKey="days" radius={[0, 6, 6, 0]} fill="#2f7f9f" />
@@ -1256,7 +1308,7 @@ export default function Home() {
             </section>
           </div>
 
-          <aside className="rounded-lg border border-white/70 bg-white/82 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur-xl xl:sticky xl:top-4 xl:self-start">
+          <aside className="rounded-lg border border-white/70 bg-white/82 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.09)] backdrop-blur-xl dark:border-white/10 dark:bg-card/82 dark:shadow-[0_24px_70px_rgba(0,0,0,0.34)] xl:sticky xl:top-4 xl:self-start">
             {selectedItem ? (
               <ItemDetail
                 item={selectedItem}
@@ -1265,9 +1317,9 @@ export default function Home() {
               />
             ) : (
               <div className="flex min-h-96 flex-col items-center justify-center text-center">
-                <ShieldCheck className="mb-3 size-11 text-slate-300" />
+                <ShieldCheck className="mb-3 size-11 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">Select an item</h2>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   Product details and documents will appear here.
                 </p>
               </div>
@@ -1279,15 +1331,15 @@ export default function Home() {
       </div>
 
       {isFormOpen ? (
-        <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm">
-          <div className="mx-auto my-4 max-w-4xl rounded-lg bg-white shadow-2xl">
+        <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm dark:bg-black/70">
+          <div className="mx-auto my-4 max-w-4xl rounded-lg bg-white shadow-2xl dark:border dark:border-white/10 dark:bg-card">
             <form onSubmit={handleSubmit} className="p-4 sm:p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold">
                     {editingId ? 'Edit warranty item' : 'Add warranty item'}
                   </h2>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     Capture the purchase, coverage, contacts, and documents in
                     one place.
                   </p>
@@ -1379,8 +1431,8 @@ export default function Home() {
                         onClick={() => updateForm('purchaseMode', mode)}
                         className={`flex h-10 items-center justify-center gap-2 rounded-lg border text-sm font-medium capitalize transition ${
                           form.purchaseMode === mode
-                            ? 'border-emerald-700 bg-emerald-50 text-emerald-800'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
+                            ? 'border-emerald-700 bg-emerald-50 text-emerald-800 dark:border-emerald-300 dark:bg-emerald-300/18 dark:text-emerald-100'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-emerald-300/60'
                         }`}
                       >
                         {mode === 'online' ? (
@@ -1441,16 +1493,16 @@ export default function Home() {
                 />
               </Field>
 
-              <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+              <div className="mt-5 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-white/15 dark:bg-white/5">
                 <label
                   htmlFor="document-upload"
-                  className="flex cursor-pointer flex-col items-center justify-center rounded-lg bg-white px-4 py-6 text-center"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-lg bg-white px-4 py-6 text-center transition hover:bg-emerald-50/60 dark:bg-white/6 dark:hover:bg-white/10"
                 >
-                  <Upload className="mb-2 size-7 text-emerald-700" />
+                  <Upload className="mb-2 size-7 text-emerald-700 dark:text-emerald-300" />
                   <span className="text-sm font-semibold">
                     Upload invoices, manuals, warranty cards, and product images
                   </span>
-                  <span className="mt-1 text-xs text-slate-500">
+                  <span className="mt-1 text-xs text-muted-foreground">
                     PDF and image files are stored with this warranty item.
                   </span>
                   <Input
@@ -1489,7 +1541,7 @@ export default function Home() {
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-emerald-700 text-white hover:bg-emerald-800"
+                  className="bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-300 dark:text-slate-950 dark:hover:bg-emerald-200"
                   disabled={isSaving}
                 >
                   <ShieldCheck className="size-4" />
@@ -1526,25 +1578,57 @@ function MetricCard({
   tone?: 'emerald' | 'amber';
 }) {
   return (
-    <div className="rounded-lg border border-white/70 bg-white/78 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(15,23,42,0.09)]">
+    <div className="rounded-lg border border-white/70 bg-white/78 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(15,23,42,0.09)] dark:border-white/10 dark:bg-card/78 dark:shadow-[0_14px_40px_rgba(0,0,0,0.24)] dark:hover:shadow-[0_18px_48px_rgba(0,0,0,0.32)]">
       <div className="flex items-center justify-between gap-3">
         <div
           className={`flex size-10 items-center justify-center rounded-lg shadow-sm ${
             tone === 'amber'
-              ? 'bg-amber-100 text-amber-700'
-              : 'bg-emerald-100 text-emerald-700'
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-300/18 dark:text-amber-200'
+              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-300/18 dark:text-emerald-200'
           }`}
         >
           {icon}
         </div>
-        <span className="text-xs font-semibold uppercase text-slate-400">
+        <span className="text-xs font-semibold uppercase text-muted-foreground">
           {label}
         </span>
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-normal text-slate-950">
+      <p className="mt-4 text-3xl font-semibold tracking-normal text-foreground">
         {value}
       </p>
-      <p className="mt-1 text-sm text-slate-500">{detail}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function ThemeToggle({
+  value,
+  onChange,
+}: {
+  value: ThemePreference;
+  onChange: (value: ThemePreference) => void;
+}) {
+  return (
+    <div
+      className="grid h-11 grid-cols-3 rounded-lg border border-white/70 bg-white/75 p-1 shadow-sm dark:border-white/10 dark:bg-white/8"
+      aria-label="Theme preference"
+    >
+      {themeOptions.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={`flex min-w-10 items-center justify-center rounded-md px-2 text-sm font-medium transition sm:min-w-11 ${
+            value === option.value
+              ? 'bg-slate-950 text-white shadow-sm dark:bg-emerald-300 dark:text-slate-950'
+              : 'text-muted-foreground hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10'
+          }`}
+          aria-label={`Use ${option.label} theme`}
+          title={`${option.label} theme`}
+        >
+          {option.icon}
+        </button>
+      ))}
     </div>
   );
 }
@@ -1566,7 +1650,7 @@ function AboutSection() {
   ];
 
   return (
-    <section className="rounded-lg border border-white/70 bg-slate-950 p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)]">
+    <section className="rounded-lg border border-white/70 bg-slate-950 p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] dark:border-emerald-300/20 dark:bg-slate-950/76 dark:shadow-[0_24px_70px_rgba(0,0,0,0.36)]">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-end">
         <div>
           <p className="text-xs font-semibold uppercase text-emerald-300">
@@ -1589,7 +1673,7 @@ function AboutSection() {
           {highlights.map((item) => (
             <div
               key={item.title}
-              className="rounded-lg border border-white/10 bg-white/8 p-4"
+              className="rounded-lg border border-white/10 bg-white/8 p-4 dark:bg-white/6"
             >
               <h3 className="text-sm font-semibold text-white">
                 {item.title}
@@ -1630,9 +1714,9 @@ function WarrantyRow({
     expired: 'bg-red-500',
   };
   const trackStyles = {
-    active: 'bg-emerald-100',
-    expiring: 'bg-amber-100',
-    expired: 'bg-red-100',
+    active: 'bg-emerald-100 dark:bg-emerald-300/18',
+    expiring: 'bg-amber-100 dark:bg-amber-300/18',
+    expired: 'bg-red-100 dark:bg-red-300/18',
   };
   const healthLabel = {
     active: 'Healthy coverage',
@@ -1643,8 +1727,8 @@ function WarrantyRow({
     <article
       className={`min-w-0 overflow-hidden rounded-lg border p-4 transition ${
         isSelected
-          ? 'border-emerald-400 bg-emerald-50/70 shadow-[0_0_0_3px_rgba(16,185,129,0.10)]'
-          : 'border-white/70 bg-white/82 shadow-sm hover:border-emerald-200 hover:bg-white'
+          ? 'border-emerald-400 bg-emerald-50/70 shadow-[0_0_0_3px_rgba(16,185,129,0.10)] dark:border-emerald-300/70 dark:bg-emerald-300/12 dark:shadow-[0_0_0_3px_rgba(110,231,183,0.13)]'
+          : 'border-white/70 bg-white/82 shadow-sm hover:border-emerald-200 hover:bg-white dark:border-white/10 dark:bg-white/7 dark:hover:border-emerald-300/40 dark:hover:bg-white/10'
       }`}
     >
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1659,39 +1743,41 @@ function WarrantyRow({
             </h3>
             <StatusBadge status={status} />
           </div>
-          <p className="mt-1 min-w-0 text-sm text-slate-500 break-words [overflow-wrap:anywhere]">
+          <p className="mt-1 min-w-0 text-sm text-muted-foreground break-words [overflow-wrap:anywhere]">
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
           <div className="mt-3">
-            <div className={`h-2 overflow-hidden rounded-full ${trackStyles[status]}`}>
+            <div
+              className={`h-2 overflow-hidden rounded-full ${trackStyles[status]}`}
+            >
               <div
                 className={`h-full rounded-full ${barStyles[status]}`}
                 style={{ width: `${coveragePercent}%` }}
               />
             </div>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <span className="font-semibold text-slate-800">
+              <span className="font-semibold text-foreground">
                 {formatRemaining(item.warrantyEndDate)}
               </span>
-              <span className="text-slate-500">
+              <span className="text-muted-foreground">
                 Covered until {formatDate(item.warrantyEndDate)}
               </span>
             </div>
-            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <ShieldCheck className="size-3.5 shrink-0 text-emerald-700" />
+                <ShieldCheck className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" />
                 {healthLabel[status]}
               </span>
               <span className="inline-flex min-w-0 items-center gap-1.5">
-                <FileText className="size-3.5 shrink-0 text-slate-400" />
+                <FileText className="size-3.5 shrink-0 text-muted-foreground" />
                 {formatMoney(item.invoiceAmount)} invoice
               </span>
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 <CheckCircle2
                   className={`size-3.5 shrink-0 ${
                     item.documents.length
-                      ? 'text-emerald-700'
-                      : 'text-amber-600'
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : 'text-amber-600 dark:text-amber-300'
                   }`}
                 />
                 {documentsLabel}
@@ -1699,7 +1785,7 @@ function WarrantyRow({
             </div>
           </div>
         </button>
-        <div className="flex shrink-0 gap-1 self-start rounded-lg bg-white/70 p-1 shadow-sm">
+        <div className="flex shrink-0 gap-1 self-start rounded-lg bg-white/70 p-1 shadow-sm dark:bg-white/8">
           <Button
             type="button"
             variant="ghost"
@@ -1715,7 +1801,7 @@ function WarrantyRow({
             size="icon"
             aria-label="Delete item"
             onClick={onDelete}
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:bg-red-400/10 dark:hover:text-red-200"
           >
             <Trash2 className="size-4" />
           </Button>
@@ -1737,13 +1823,13 @@ function ItemDetail({
   const status = getStatus(item.warrantyEndDate);
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 pb-4">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 pb-4 dark:border-white/10">
         <div>
           <StatusBadge status={status} />
           <h2 className="mt-3 text-2xl font-semibold tracking-normal">
             {item.productName}
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             {item.brand || 'Unknown brand'} · {item.category || 'Uncategorized'}
           </p>
         </div>
@@ -1783,8 +1869,8 @@ function ItemDetail({
 
       <div className="mt-6">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-slate-950">Documents</h3>
-          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+          <h3 className="font-semibold text-foreground">Documents</h3>
+          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-300/18 dark:text-emerald-200">
             {item.documents.length} saved
           </span>
         </div>
@@ -1799,7 +1885,7 @@ function ItemDetail({
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white/60 p-5 text-center text-sm text-slate-500">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white/60 p-5 text-center text-sm text-muted-foreground dark:border-white/15 dark:bg-white/5">
             Add invoices, manuals, warranty cards, or product images when
             editing this item.
           </div>
@@ -1828,9 +1914,11 @@ function ItemDetail({
 
 function StatusBadge({ status }: { status: WarrantyStatus }) {
   const styles = {
-    active: 'bg-emerald-100 text-emerald-800',
-    expiring: 'bg-amber-100 text-amber-800',
-    expired: 'bg-red-100 text-red-700',
+    active:
+      'bg-emerald-100 text-emerald-800 dark:bg-emerald-300/18 dark:text-emerald-200',
+    expiring:
+      'bg-amber-100 text-amber-800 dark:bg-amber-300/18 dark:text-amber-200',
+    expired: 'bg-red-100 text-red-700 dark:bg-red-300/18 dark:text-red-200',
   };
   const labels = {
     active: 'Active',
@@ -1850,12 +1938,14 @@ function DetailTile({
   value: string;
 }) {
   return (
-    <div className="rounded-lg border border-white/80 bg-white/70 p-3 shadow-sm">
-      <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+    <div className="rounded-lg border border-white/80 bg-white/70 p-3 shadow-sm dark:border-white/10 dark:bg-white/7">
+      <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-300/18 dark:text-emerald-200">
         {icon}
       </div>
-      <p className="text-xs font-semibold uppercase text-slate-400">{label}</p>
-      <p className="mt-1 break-words text-sm font-semibold capitalize text-slate-900">
+      <p className="text-xs font-semibold uppercase text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-semibold capitalize text-foreground">
         {value}
       </p>
     </div>
@@ -1871,10 +1961,10 @@ function InfoBlock({
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-semibold uppercase text-slate-400">
+      <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
         {label}
       </p>
-      <p className="rounded-lg border border-white/80 bg-white/70 p-3 text-slate-700 shadow-sm">
+      <p className="rounded-lg border border-white/80 bg-white/70 p-3 text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/7 dark:text-slate-200">
         {children}
       </p>
     </div>
@@ -1900,19 +1990,21 @@ function CollapsibleNotes({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase text-slate-400">Notes</p>
+        <p className="text-xs font-semibold uppercase text-muted-foreground">
+          Notes
+        </p>
         {shouldCollapse ? (
           <button
             type="button"
             onClick={() => setIsExpanded((current) => !current)}
-            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+            className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
           >
             {isExpanded ? 'Show less' : 'Show more'}
           </button>
         ) : null}
       </div>
       <p
-        className={`rounded-lg border border-white/80 bg-white/70 p-3 text-slate-700 shadow-sm ${
+        className={`rounded-lg border border-white/80 bg-white/70 p-3 text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/7 dark:text-slate-200 ${
           shouldCollapse && !isExpanded
             ? 'max-h-24 overflow-hidden [mask-image:linear-gradient(180deg,#000_70%,transparent)]'
             : ''
@@ -1937,7 +2029,7 @@ function Field({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
       </span>
@@ -1959,11 +2051,11 @@ function DocumentChip({
   const previewSource = doc.dataUrl ?? doc.url ?? '';
   const downloadSource = doc.downloadUrl ?? doc.dataUrl ?? doc.url ?? '#';
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/80 bg-white/76 p-2 shadow-sm transition hover:border-emerald-200 hover:bg-white">
+    <div className="flex items-center gap-3 rounded-lg border border-white/80 bg-white/76 p-2 shadow-sm transition hover:border-emerald-200 hover:bg-white dark:border-white/10 dark:bg-white/7 dark:hover:border-emerald-300/40 dark:hover:bg-white/10">
       <button
         type="button"
         onClick={onPreview}
-        className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-500 shadow-inner"
+        className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-500 shadow-inner dark:bg-white/10 dark:text-slate-300"
         aria-label={`Preview ${doc.name}`}
       >
         {isImage ? (
@@ -1980,15 +2072,15 @@ function DocumentChip({
         )}
       </button>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">
+        <p className="truncate text-sm font-semibold text-foreground">
           {doc.name}
         </p>
-        <p className="text-xs text-slate-500">{fileSize(doc.size)}</p>
+        <p className="text-xs text-muted-foreground">{fileSize(doc.size)}</p>
       </div>
       <a
         href={downloadSource}
         download={doc.name}
-        className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-300/12 dark:hover:text-emerald-200"
         aria-label={`Download ${doc.name}`}
       >
         <Download className="size-4" />
@@ -1997,7 +2089,7 @@ function DocumentChip({
         <button
           type="button"
           onClick={onRemove}
-          className="flex size-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+          className="flex size-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-400/10"
           aria-label={`Remove ${doc.name}`}
         >
           <Trash2 className="size-4" />
@@ -2019,9 +2111,9 @@ function DocumentPreview({
   const previewSource = doc.dataUrl ?? doc.url ?? '';
   const downloadSource = doc.downloadUrl ?? doc.dataUrl ?? doc.url ?? '#';
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 p-3 backdrop-blur-sm">
-      <div className="mx-auto flex h-full max-w-5xl flex-col rounded-lg bg-white shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-3">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 p-3 backdrop-blur-sm dark:bg-black/78">
+      <div className="mx-auto flex h-full max-w-5xl flex-col rounded-lg bg-white shadow-2xl dark:border dark:border-white/10 dark:bg-card">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-3 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-2">
             {isImage ? (
               <ImageIcon className="size-5" />
@@ -2030,14 +2122,16 @@ function DocumentPreview({
             )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{doc.name}</p>
-              <p className="text-xs text-slate-500">{fileSize(doc.size)}</p>
+              <p className="text-xs text-muted-foreground">
+                {fileSize(doc.size)}
+              </p>
             </div>
           </div>
           <div className="flex gap-1">
             <a
               href={downloadSource}
               download={doc.name}
-              className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium hover:bg-slate-100"
+              className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/10"
             >
               <Download className="size-4" />
               Download
@@ -2053,7 +2147,7 @@ function DocumentPreview({
             </Button>
           </div>
         </div>
-        <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-100 p-3">
+        <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-100 p-3 dark:bg-slate-950/70">
           {isImage ? (
             <Image
               src={previewSource}
@@ -2071,14 +2165,14 @@ function DocumentPreview({
               className="h-full w-full rounded-lg bg-white"
               aria-label={doc.name}
             >
-              <p className="p-6 text-center text-sm text-slate-600">
+              <p className="p-6 text-center text-sm text-slate-600 dark:text-slate-300">
                 PDF preview is unavailable in this browser. Use download
                 instead.
               </p>
             </object>
           ) : null}
           {!isImage && !isPdf ? (
-            <div className="rounded-lg bg-white p-8 text-center text-sm text-slate-600">
+            <div className="rounded-lg bg-white p-8 text-center text-sm text-slate-600 dark:bg-white/8 dark:text-slate-300">
               Preview is not available for this file type.
             </div>
           ) : null}
