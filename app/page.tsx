@@ -507,6 +507,46 @@ export default function Home() {
     };
   }, [authStatus]);
 
+  useEffect(() => {
+    if (authStatus !== 'signed-in' || !isReady) return;
+
+    let ignore = false;
+    let refreshInFlight = false;
+
+    const refreshItems = () => {
+      if (ignore || refreshInFlight || document.visibilityState !== 'visible')
+        return;
+
+      refreshInFlight = true;
+      loadWarrantyItems()
+        .then((nextItems) => {
+          if (ignore) return;
+          setItems(nextItems);
+          setSelectedId((currentId) =>
+            currentId && nextItems.some((item) => item.id === currentId)
+              ? currentId
+              : nextItems[0]?.id ?? '',
+          );
+          setLoadError('');
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          refreshInFlight = false;
+        });
+    };
+
+    window.addEventListener('focus', refreshItems);
+    document.addEventListener('visibilitychange', refreshItems);
+    const intervalId = window.setInterval(refreshItems, 30000);
+
+    return () => {
+      ignore = true;
+      window.removeEventListener('focus', refreshItems);
+      document.removeEventListener('visibilitychange', refreshItems);
+      window.clearInterval(intervalId);
+    };
+  }, [authStatus, isReady]);
+
   const startAdd = useCallback(() => {
     setForm(createBlankForm());
     setDocuments([]);
