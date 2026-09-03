@@ -94,7 +94,7 @@ function getBindings() {
 }
 
 export function getUserId(request: Request) {
-  return request.headers.get('oai-authenticated-user-id') ?? 'local-dev-user';
+  return request.headers.get('oai-authenticated-user-id');
 }
 
 export async function ensureSchema() {

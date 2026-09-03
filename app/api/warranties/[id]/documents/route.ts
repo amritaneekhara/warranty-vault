@@ -16,11 +16,15 @@ async function getId(context: RouteContext) {
 }
 
 export async function POST(request: Request, context: RouteContext) {
+  const userId = getUserId(request);
+  if (!userId)
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const body = (await request.json().catch(() => ({}))) as {
     documents?: IncomingDocument[];
   };
   const item = await addDocumentsToWarranty(
-    getUserId(request),
+    userId,
     await getId(context),
     Array.isArray(body.documents) ? body.documents : [],
   );

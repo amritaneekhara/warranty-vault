@@ -33,6 +33,7 @@ import { Textarea } from '@/components/ui/textarea';
 type PurchaseMode = 'online' | 'offline';
 type WarrantyStatus = 'active' | 'expiring' | 'expired';
 type ThemePreference = 'light' | 'dark' | 'system';
+type AuthStatus = 'checking' | 'signed-out' | 'signed-in';
 
 type WarrantyDocument = {
   id: string;
@@ -416,6 +417,7 @@ function fileSize(size: number) {
 }
 
 export default function Home() {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [themePreference, setThemePreference] =
     useState<ThemePreference>('system');
   const [items, setItems] = useState<WarrantyItem[]>([]);
@@ -433,6 +435,25 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const itemsRef = useRef<WarrantyItem[]>([]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    fetch('/api/session', { cache: 'no-store' })
+      .then((response) => response.json() as Promise<{ authenticated?: boolean }>)
+      .then((session) => {
+        if (!ignore) {
+          setAuthStatus(session.authenticated ? 'signed-in' : 'signed-out');
+        }
+      })
+      .catch(() => {
+        if (!ignore) setAuthStatus('signed-out');
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem('warranty-vault-theme');
@@ -461,7 +482,10 @@ export default function Home() {
   }, [items]);
 
   useEffect(() => {
+    if (authStatus !== 'signed-in') return;
+
     let ignore = false;
+    setIsReady(false);
 
     loadWarrantyItems()
       .then((nextItems) => {
@@ -481,7 +505,7 @@ export default function Home() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [authStatus]);
 
   const startAdd = useCallback(() => {
     setForm(createBlankForm());
@@ -1127,7 +1151,36 @@ export default function Home() {
     setDocuments((current) => current.filter((doc) => doc.id !== docId));
   }
 
-  if (!isReady) {
+  if (authStatus === 'signed-out') {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] px-4 text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(135deg,#0b1220_0%,#111827_52%,#171717_100%)]">
+        <section className="w-full max-w-md rounded-lg border border-white/70 bg-white/82 p-8 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-card/82 dark:shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
+          <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm dark:bg-emerald-300 dark:text-slate-950">
+            <ShieldCheck className="size-7" />
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+            Private warranty records
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+            Sign in to Warranty Vault
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Sign in with ChatGPT to securely access your products, coverage
+            dates, invoices, manuals, and warranty documents.
+          </p>
+          <a
+            href="/signin-with-chatgpt?return_to=%2F"
+            target="_top"
+            className="mt-7 flex h-11 w-full items-center justify-center rounded-lg bg-slate-950 text-sm font-medium text-white shadow-sm hover:bg-slate-800 dark:bg-emerald-300 dark:text-slate-950 dark:hover:bg-emerald-200"
+          >
+            Sign in with ChatGPT
+          </a>
+        </section>
+      </main>
+    );
+  }
+
+  if (authStatus === 'checking' || !isReady) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#eef7f4_44%,#f9f3ea_100%)] text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_30%),linear-gradient(135deg,#0b1220_0%,#111827_52%,#171717_100%)]">
         <div className="rounded-lg border border-white/70 bg-white/82 p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-card/82 dark:shadow-[0_24px_70px_rgba(0,0,0,0.34)]">

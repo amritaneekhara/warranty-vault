@@ -12,8 +12,12 @@ async function getId(context: RouteContext) {
 }
 
 export async function GET(request: Request, context: RouteContext) {
+  const userId = getUserId(request);
+  if (!userId)
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+
   const result = await getDocumentForDownload(
-    getUserId(request),
+    userId,
     await getId(context),
   );
   if (!result)
